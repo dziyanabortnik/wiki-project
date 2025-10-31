@@ -1,0 +1,39 @@
+body {
+  font-family: "Inter", Arial, sans-serif;
+  background-color: #f7f8fa;
+  color: #222;
+  margin: 0;
+  padding: 0;
+}
+
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: stretch;
+}
+
+.list, .view, .article {
+  max-width: 700px;
+  margin: auto;
+  padding: 20px;
+}
+
+.create-input {
+  padding: 8px;
+}
+
+.create-button {
+  padding: 8px 16px;
+  width: 50%;
+}
+
+.error-message {
+  color: red;
+  background-color: #ffe6e6;
+  padding: 8px;
+  border: 1px solid red;
+  border-radius: 2px;
+  margin-bottom: 12px;
+  font-size: 14px;
+}
