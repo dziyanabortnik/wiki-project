@@ -27,3 +27,13 @@ form {
   padding: 8px 16px;
   width: 50%;
 }
+
+.error-message {
+  color: red;
+  background-color: #ffe6e6;
+  padding: 8px;
+  border: 1px solid red;
+  border-radius: 2px;
+  margin-bottom: 12px;
+  font-size: 14px;
+}

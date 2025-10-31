@@ -2,6 +2,7 @@ import { useState, forwardRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
+import '../App.css'
 
 const QuillEditor = forwardRef(({ value, onChange }, ref) => (
   <ReactQuill ref={ref} value={value} onChange={onChange} />
@@ -11,13 +12,26 @@ export default function ArticleForm() {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError('');
+
+    if (!title.trim()) {
+      setError('Title is required.');
+      return;
+    }
+
+    const textOnly = content.replace(/<[^>]*>/g, '').trim();
+    if (!textOnly) {
+      setError('Content is required.');
+      return;
+    }
 
     if (!title.trim() || !content.trim()) {
-      alert('Title and content are required.');
+      setError('Title and content are required.');
       return;
     }
 
@@ -46,7 +60,7 @@ export default function ArticleForm() {
       navigate('/');
     } catch (err) {
       console.error('Submission failed:', err);
-      alert(`Error: ${err.message}`);
+      setError(err.message);
     } finally {
       setLoading(false);
     }
@@ -55,6 +69,13 @@ export default function ArticleForm() {
   return (
     <div className='article'>
       <h2>Create New Article</h2>
+
+      {error && (
+        <div className='error-message'>
+          {error}
+        </div>
+      )}
+      
       <form onSubmit={handleSubmit}>
         <input
           placeholder="Title"
