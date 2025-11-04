@@ -85,6 +85,60 @@ app.post('/articles', (req, res) => {
   }
 });
 
+// Update existing article
+app.put('/articles/:id', (req, res) => {
+  const articleId = req.params.id;
+  const { title, content } = req.body;
+  const filePath = path.join(DATA_DIR, `${articleId}.json`);
+
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({ error: 'Article not found' });
+  }
+
+  if (!title || !content) {
+    return res.status(400).json({ error: 'Title and content are required' });
+  }
+
+  try {
+    // Read existing article to preserve createdAt
+    const existingContent = fs.readFileSync(filePath, 'utf8');
+    const existingArticle = JSON.parse(existingContent);
+    
+    const updatedArticle = {
+      ...existingArticle,
+      title,
+      content,
+      updatedAt: new Date().toISOString()
+    };
+
+    fs.writeFileSync(filePath, JSON.stringify(updatedArticle, null, 2));
+    console.log(`Article updated: ${filePath}`);
+    res.json(updatedArticle);
+  } catch (err) {
+    console.error('Failed to update article:', err);
+    res.status(500).json({ error: 'Failed to update article' });
+  }
+});
+
+// Delete existing article
+app.delete('/articles/:id', (req, res) => {
+  const articleId = req.params.id;
+  const filePath = path.join(DATA_DIR, `${articleId}.json`);
+
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({ error: 'Article not found' });
+  }
+
+  try {
+    fs.unlinkSync(filePath);
+    console.log(`Article deleted: ${filePath}`);
+    res.status(204).send();
+  } catch (err) {
+    console.error('Failed to delete article:', err);
+    res.status(500).json({ error: 'Failed to delete article' });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Server running at http://localhost:${PORT}`);
 });
