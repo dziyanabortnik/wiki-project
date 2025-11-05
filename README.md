@@ -7,12 +7,20 @@ A full-stack application for creating and managing articles with a WYSIWYG edito
 - Write articles with formatting tools
 - See all your articles in a list  
 - Read full articles
+- Edit existing articles
+- Cancel editing
+- Delete articles
 - Articles save automatically as files
 
 ## Built with
 
 **Frontend:** React, React Router, React Quill, Vite  
 **Backend:** Node.js, Express.js
+
+## Architecture & Code Quality
+
+- **Custom React Hooks**: `useArticleActions` for reusable delete logic across components
+- **Error Handling**: Comprehensive validation on both frontend and backend
 
 ## Installation & Setup
 
@@ -46,6 +54,8 @@ npm run dev
 - GET /articles - List all articles
 - GET /articles/:id - Get specific article
 - POST /articles - Create new article
+- PUT /articles/:id - Update existing article
+- DELETE /articles/:id - Delete article
 
 ## Usage
 1. **View Articles**: Navigate to the home page to see all articles
@@ -53,3 +63,11 @@ npm run dev
 3. **Write Content**: Use the WYSIWYG editor to format content
 4. **Save**: Submit the form to save article
 5. **Read**: Click any article title to view full content
+6. **Edit**: Click "Edit" while viewing an article to modify it
+7. **Cancel Editing**: Click "Cancel" to discard changes and return to previous page
+8. **Delete**: Click "Delete" to remove an article (with confirmation)
+
+## Validation & Error Handling
+- **Article Existence Validation**: Cannot edit or delete non-existent articles
+- **Required Fields**: Title and content validation on both frontend and backend
+- **User Feedback**: Clear error messages and loading states

@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useArticleActions } from '../hooks/useArticleActions';
 
 export default function ArticleList() {
   const [articles, setArticles] = useState([]);
+  const { deleteArticle } = useArticleActions();
 
   // Fetch articles list on component mount
   useEffect(() => {
@@ -23,15 +25,27 @@ export default function ArticleList() {
       });
   }, []);
 
+  const handleDelete = async (id, title) => {
+    await deleteArticle(id, title, () => {
+      setArticles(articles.filter(article => article.id !== id));
+    });
+  };
 
   return (
     <div className='list'>
       <h2>Articles</h2>
-      <Link to="/new">Create New Article</Link>
+
+      <Link to='/new' className='create-new-btn'>Create New Article</Link>
+
       <ul>
         {articles.map(a => (
-          <li key={a.id}>
-            <Link to={`/view/${a.id}`}>{a.title}</Link>
+          <li key={a.id} className='article-item'>
+            <Link to={`/view/${a.id}`} className='article-title'>{a.title}</Link>
+            
+            <div className="article-actions">
+              <Link to={`/edit/${a.id}`} className="edit-link">Edit</Link>
+              <button onClick={() => handleDelete(a.id, a.title)} className="delete-btn">Delete</button>
+            </div>
           </li>
         ))}
       </ul>
