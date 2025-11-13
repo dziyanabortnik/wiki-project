@@ -1,8 +1,9 @@
-import { useState, forwardRef } from 'react';
+import { useState, forwardRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
 import '../App.css'
+import AttachmentManager from './AttachmentManager';
 
 const QuillEditor = forwardRef(({ value, onChange }, ref) => (
   <ReactQuill ref={ref} value={value} onChange={onChange} />
@@ -13,7 +14,19 @@ export default function ArticleForm() {
   const [content, setContent] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [attachments, setAttachments] = useState([]);
   const navigate = useNavigate();
+
+  // Cleanup object URLs on unmount
+  useEffect(() => {
+    return () => {
+      attachments.forEach(attachment => {
+        if (attachment.previewUrl) {
+          URL.revokeObjectURL(attachment.previewUrl);
+        }
+      });
+    };
+  }, [attachments]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -38,25 +51,49 @@ export default function ArticleForm() {
     setLoading(true);
 
     try {
-      const res = await fetch('http://localhost:3000/articles', {
+      const articleRes = await fetch('http://localhost:3000/articles', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title, content }),
       });
 
-      let data;
-      try {
-        data = await res.json();
-      } catch (parseErr) {
-        throw new Error('Server returned invalid JSON');
+      if (!articleRes.ok) {
+        const errorText = await articleRes.text();
+        throw new Error(errorText || `Failed to create article (${articleRes.status})`);
       }
 
-      if (!res.ok) {
-        console.error('Server error:', data);
-        throw new Error(data?.error || 'Failed to create article');
+      const articleData = await articleRes.json();
+      const articleId = articleData.id;
+      console.log('Article created with ID:', articleId);
+
+       // Upload attachments if any
+      if (attachments.length > 0) {
+        console.log(`Uploading ${attachments.length} attachments...`);
+        
+        for (const attachment of attachments) {
+          try {
+            const formData = new FormData();
+            formData.append('files', attachment.file);
+
+            console.log(`Uploading attachment: ${attachment.originalName}`);
+            const attachmentRes = await fetch(`http://localhost:3000/articles/${articleId}/attachments`, {
+              method: 'POST',
+              body: formData,
+            });
+
+            if (!attachmentRes.ok) {
+              const errorText = await attachmentRes.text();
+              console.warn(`Failed to upload attachment ${attachment.originalName}:`, errorText);
+            } else {
+              console.log(`Attachment uploaded: ${attachment.originalName}`);
+            }
+          } catch (attachmentErr) {
+            console.error(`Error uploading attachment ${attachment.originalName}:`, attachmentErr);
+          }
+        }
       }
 
-      console.log('Article created:', data);
+      console.log('Article creation completed:', articleData);
       navigate('/');
     } catch (err) {
       console.error('Submission failed:', err);
@@ -85,6 +122,14 @@ export default function ArticleForm() {
           className='create-input'
         />
         <QuillEditor value={content} onChange={setContent} />
+
+        <AttachmentManager
+          articleId={null}
+          attachments={attachments}
+          onAttachmentsChange={setAttachments}
+          creationMode={true}
+        />
+
         <button type="submit" disabled={loading} className='create-button'>
           {loading ? 'Submitting...' : 'Submit'}
         </button>

@@ -187,3 +187,238 @@ form {
   background-color: #e2e8f0;
   color: #4a5568;
 }
+
+.attachments-section {
+  padding: 16px 20px;
+  border: 1px solid #e2e8f0;
+  border-radius: 2px;
+  background-color: white;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.attachments-section h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 500;
+  color: #383f4a;
+}
+
+.file-upload input {
+  padding: 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 2px;
+  font-size: 14px;
+  background-color: white;
+}
+
+.attachments-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.attachments-list div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 2px;
+  background-color: #f7fafc;
+}
+
+.attachments-list a {
+  color: #2b6cb0;
+  text-decoration: none;
+  font-size: 14px;
+}
+
+.attachments-list a:hover {
+  color: #2c5282;
+}
+
+.attachments-list span {
+  font-size: 14px;
+  color: #4a5568;
+}
+
+.attachments-list p {
+  margin: 0;
+}
+
+.attachments-list button {
+  color: #c53030;
+  border: 1px solid #fcb2b2;
+  background-color: #ffc9c9;
+  padding: 4px 8px;
+  border-radius: 2px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.attachments-list button:hover {
+  background-color: #fca9a9;
+  border-color: #c53030;
+}
+
+.article-attachments {
+  margin-bottom: 12px;
+  padding: 16px 20px;
+  border: 1px solid #e2e8f0;
+  border-radius: 2px;
+  background-color: white;
+}
+
+.article-attachments h3 {
+  margin: 0 0 16px 0;
+  font-size: 16px;
+  font-weight: 500;
+  color: #383f4a;
+}
+
+.attachment-item {
+  padding: 8px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 2px;
+  background-color: #f7fafc;
+  margin-bottom: 8px;
+}
+
+.attachment-name {
+  color: #2b6cb0;
+  text-decoration: none;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.attachment-name:hover {
+  color: #2c5282;
+}
+
+.notifications-container {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 400px;
+  pointer-events: none;
+}
+
+.notification {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 12px;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  animation: slideInRight 0.3s ease-out;
+  pointer-events: all;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+  max-height: 120px;
+}
+
+.notification::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: currentColor;
+  opacity: 0.7;
+}
+
+.notification:hover {
+  transform: translateX(-5px);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.2);
+}
+
+.notification-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.notification-message {
+  display: block;
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 1.4;
+  margin-bottom: 4px;
+  word-wrap: break-word;
+}
+
+.notification-time {
+  color: inherit;
+  opacity: 0.7;
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.notification-close {
+  background: none;
+  border: none;
+  font-size: 20px;
+  font-weight: bold;
+  cursor: pointer;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+  color: inherit;
+  opacity: 0.6;
+}
+
+.notification-close:hover {
+  opacity: 1;
+  background: rgba(0, 0, 0, 0.1);
+  transform: scale(1.1);
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideOutRight {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+}
+
+@keyframes progressBar {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.notification.exiting {
+  animation: slideOutRight 0.3s ease-in forwards;
+}
