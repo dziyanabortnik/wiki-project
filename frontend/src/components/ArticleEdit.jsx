@@ -1,7 +1,9 @@
-import { useState, useEffect, forwardRef } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import ReactQuill from 'react-quill';
-import 'react-quill/dist/quill.snow.css';
+import { useState, useEffect, forwardRef } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import AttachmentManager from "./AttachmentManager";
+import socket from "../services/socket";
+import ReactQuill from "react-quill";
+import "react-quill/dist/quill.snow.css";
 
 const QuillEditor = forwardRef(({ value, onChange }, ref) => (
   <ReactQuill ref={ref} value={value} onChange={onChange} />
@@ -9,56 +11,80 @@ const QuillEditor = forwardRef(({ value, onChange }, ref) => (
 
 export default function ArticleEdit() {
   const { id } = useParams();
-  const [title, setTitle] = useState('');
-  const [content, setContent] = useState('');
+  const [title, setTitle] = useState("");
+  const [content, setContent] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [articleExists, setArticleExists] = useState(true);
+  const [attachments, setAttachments] = useState([]);
+  const [newAttachments, setNewAttachments] = useState([]);
   const navigate = useNavigate();
 
   // Load article data when component mounts
   useEffect(() => {
     setLoading(true);
     fetch(`http://localhost:3000/articles/${id}`)
-      .then(res => {
+      .then((res) => {
         if (!res.ok) {
           if (res.status === 404) {
             setArticleExists(false);
-            setError('Article not found');
+            setError("Article not found");
           } else {
-            throw new Error('Failed to load article');
+            throw new Error("Failed to load article");
           }
           return null;
         }
         return res.json();
       })
-      .then(article => {
+      .then((article) => {
         if (article) {
           setTitle(article.title);
           setContent(article.content);
+          setAttachments(article.attachments || []);
           setArticleExists(true);
         }
       })
-      .catch(err => {
-        console.error('Failed to load article:', err);
-        setError('Failed to load article');
+      .catch((err) => {
+        console.error("Failed to load article:", err);
+        setError("Failed to load article");
       })
       .finally(() => {
         setLoading(false);
       });
   }, [id]);
 
+  // Real-time updates via WebSocket
+  useEffect(() => {
+    if (!id) return;
+
+    socket.emit("join-article", id);
+
+    const handleArticleUpdate = (updatedArticle) => {
+      if (updatedArticle.id === id) {
+        setTitle(updatedArticle.title || "");
+        setContent(updatedArticle.content || "");
+        setAttachments(updatedArticle.attachments || []);
+      }
+    };
+
+    socket.on("article-updated", handleArticleUpdate);
+
+    return () => {
+      socket.off("article-updated", handleArticleUpdate);
+    };
+  }, [id]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
+    setError("");
 
     if (!articleExists) {
-      setError('Cannot update: Article no longer exists');
+      setError("Cannot update: Article no longer exists");
       return;
     }
 
     if (!title.trim() || !content.trim()) {
-      setError('Title and content are required.');
+      setError("Title and content are required.");
       return;
     }
 
@@ -66,31 +92,73 @@ export default function ArticleEdit() {
 
     try {
       const res = await fetch(`http://localhost:3000/articles/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title, content }),
       });
 
       if (res.status === 404) {
         setArticleExists(false);
-        throw new Error('Article not found - it may have been deleted');
+        throw new Error("Article not found - it may have been deleted");
       }
 
       let data;
       try {
         data = await res.json();
       } catch (parseErr) {
-        throw new Error('Server returned invalid JSON');
+        throw new Error("Server returned invalid JSON");
       }
 
       if (!res.ok) {
-        throw new Error(data?.error || 'Failed to update article');
+        throw new Error(data?.error || "Failed to update article");
       }
 
-      console.log('Article updated:', data);
-      navigate('/');
+      console.log("Article updated:", data);
+
+      // Upload new attachments if any
+      if (newAttachments.length > 0) {
+        console.log(`Uploading ${newAttachments.length} new attachments...`);
+
+        for (const attachment of newAttachments) {
+          try {
+            const formData = new FormData();
+            formData.append("files", attachment.file);
+
+            console.log(`Uploading new attachment: ${attachment.originalName}`);
+            const attachmentRes = await fetch(
+              `http://localhost:3000/articles/${id}/attachments`,
+              {
+                method: "POST",
+                body: formData,
+              }
+            );
+
+            if (!attachmentRes.ok) {
+              const errorText = await attachmentRes
+                .text()
+                .catch(() => "Unknown error");
+              console.error(
+                `Failed to upload attachment ${attachment.originalName}: ${errorText}`
+              );
+              setError(
+                `Failed to upload ${attachment.originalName}: ${errorText}`
+              );
+            } else {
+              console.log(
+                `New attachment uploaded: ${attachment.originalName}`
+              );
+            }
+          } catch (attachmentErr) {
+            console.error(`Error uploading new attachment:`, attachmentErr);
+          }
+        }
+
+        setNewAttachments([]);
+      }
+
+      navigate(`/view/${id}`);
     } catch (err) {
-      console.error('Update failed:', err);
+      console.error("Update failed:", err);
       setError(err.message);
     } finally {
       setLoading(false);
@@ -103,15 +171,12 @@ export default function ArticleEdit() {
 
   if (!articleExists && !loading) {
     return (
-      <div className='article'>
+      <div className="article">
         <h2>Article Not Found</h2>
         <div className="error-message">
           The article you're trying to edit does not exist or has been deleted.
         </div>
-        <button 
-          onClick={() => navigate('/')}
-          className='cancel-button'
-        >
+        <button onClick={() => navigate("/")} className="cancel-button">
           Back to Articles List
         </button>
       </div>
@@ -119,14 +184,10 @@ export default function ArticleEdit() {
   }
 
   return (
-    <div className='article'>
+    <div className="article">
       <h2>Edit Article</h2>
-      
-      {error && (
-        <div className="error-message">
-          {error}
-        </div>
-      )}
+
+      {error && <div className="error-message">{error}</div>}
 
       <form onSubmit={handleSubmit}>
         <input
@@ -135,25 +196,34 @@ export default function ArticleEdit() {
           onChange={(e) => setTitle(e.target.value)}
           required
           disabled={!articleExists || loading}
-          className='create-input'
+          className="create-input"
         />
 
         <QuillEditor value={content} onChange={setContent} />
 
+        <AttachmentManager
+          articleId={id}
+          attachments={attachments}
+          onAttachmentsChange={setAttachments}
+          newAttachments={newAttachments}
+          onNewAttachmentsChange={setNewAttachments}
+          creationMode={false}
+        />
+
         <div className="form-actions">
-          <button 
-            type="submit" 
+          <button
+            type="submit"
             disabled={loading || !articleExists}
-            className='create-button'
+            className="create-button"
           >
-            {loading ? 'Updating...' : 'Update Article'}
+            {loading ? "Updating..." : "Update Article"}
           </button>
 
-          <button 
-            type="button" 
-            onClick={handleCancel} 
+          <button
+            type="button"
+            onClick={handleCancel}
             disabled={loading}
-            className='cancel-button'
+            className="cancel-button"
           >
             Cancel
           </button>
