@@ -17,6 +17,25 @@ export default function AttachmentManager({
     const files = e.target.files;
     if (!files.length) return;
 
+    const allowedTypes = [
+      'image/jpeg',
+      'image/jpg', 
+      'image/png',
+      'image/gif',
+      'image/webp',
+      'application/pdf'
+    ];
+
+    const invalidFiles = Array.from(files).filter(file => 
+      !allowedTypes.includes(file.type)
+    );
+
+    if (invalidFiles.length > 0) {
+      setError(`Invalid file types: ${invalidFiles.map(f => f.name).join(', ')}. Only images (JPG, PNG, GIF, WebP) and PDFs are allowed.`);
+      e.target.value = "";
+      return;
+    }
+
     const newFiles = Array.from(files).map((file) => ({
       id: Date.now() + "-" + Math.random(),
       originalName: file.name,
@@ -33,6 +52,7 @@ export default function AttachmentManager({
       onNewAttachmentsChange?.([...newAttachments, ...newFiles]);
     }
     e.target.value = "";
+    setError("");
   };
 
   // Remove attachment (either new or existing)
@@ -97,7 +117,7 @@ export default function AttachmentManager({
         <input
           type="file"
           multiple
-          accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.txt,.doc,.docx"
+          accept=".jpg,.jpeg,.png,.gif,.webp,.pdf"
           onChange={handleFileUpload}
           disabled={uploading}
         />
