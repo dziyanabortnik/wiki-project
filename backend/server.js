@@ -2,143 +2,161 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const cors = require('cors');
+const { handleFileUpload } = require('./middleware/upload');
+const SocketService = require('./services/socketService');
+const ArticleService = require('./services/articleService');
+const http = require('http');
 
 const app = express();
-const PORT = 3000;
-const DATA_DIR = path.join(__dirname, 'data');
+const server = http.createServer(app);
 
-app.use(cors());
-app.use(express.json());
+// Initialize services
+const socketService = new SocketService(server);
+const articleService = new ArticleService(
+  path.join(__dirname, 'data'),
+  path.join(__dirname, 'uploads')
+);
+
+const PORT = 3000;
+
+// Middleware
+app.use(cors({
+  origin: ["http://localhost:5173", "http://localhost:5174"],
+  credentials: true
+}));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Get all articles
 app.get('/articles', (req, res) => {
   try {
-    if (!fs.existsSync(DATA_DIR)) {
-      return res.json([]);
-    }
-    
-    const files = fs.readdirSync(DATA_DIR);
-    const articles = files
-      .filter(file => file.endsWith('.json'))
-      .map(file => {
-        try {
-          const content = fs.readFileSync(path.join(DATA_DIR, file), 'utf8');
-          const { title } = JSON.parse(content);
-          return { id: path.basename(file, '.json'), title };
-        } catch (err) {
-          return null;
-        }
-      })
-      .filter(Boolean);
-
+    const articles = articleService.getAllArticles();
     res.json(articles);
   } catch (err) {
-    res.status(500).json({ error: 'Failed to read articles' });
+    res.status(500).json({ error: err.message });
   }
 });
 
 // Get specific article by ID
 app.get('/articles/:id', (req, res) => {
-  const filePath = path.join(DATA_DIR, `${req.params.id}.json`);
-
-  if (!fs.existsSync(filePath)) {
-    return res.status(404).json({ error: 'Article not found' });
-  }
-
   try {
-    const content = fs.readFileSync(filePath, 'utf8');
-    const article = JSON.parse(content);
+    const article = articleService.getArticleById(req.params.id);
     res.json(article);
   } catch (err) {
-    res.status(500).json({ error: 'Failed to read article' });
+    if (err.message === 'Article not found') {
+      res.status(404).json({ error: err.message });
+    } else {
+      res.status(500).json({ error: err.message });
+    }
   }
 });
 
 // Create new article
 app.post('/articles', (req, res) => {
-  const { title, content } = req.body;
-
-  if (!title || !content) {
-    return res.status(400).json({ error: 'Title and content are required' });
-  }
-
-  const id = Date.now().toString();
-  const article = {
-    id,
-    title,
-    content,
-    createdAt: new Date().toISOString()
-  };
-
-  const filePath = path.join(DATA_DIR, `${id}.json`);
-
   try {
-    // Create data folder if it doesn't exist
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
-    
-    fs.writeFileSync(filePath, JSON.stringify(article, null, 2));
+    const article = articleService.createArticle(req.body);
     res.status(201).json(article);
   } catch (err) {
-    res.status(500).json({ error: 'Failed to save article' });
+    res.status(400).json({ error: err.message });
   }
 });
 
 // Update existing article
 app.put('/articles/:id', (req, res) => {
-  const articleId = req.params.id;
-  const { title, content } = req.body;
-  const filePath = path.join(DATA_DIR, `${articleId}.json`);
-
-  if (!fs.existsSync(filePath)) {
-    return res.status(404).json({ error: 'Article not found' });
-  }
-
-  if (!title || !content) {
-    return res.status(400).json({ error: 'Title and content are required' });
-  }
-
   try {
-    // Read existing article to preserve createdAt
-    const existingContent = fs.readFileSync(filePath, 'utf8');
-    const existingArticle = JSON.parse(existingContent);
-    
-    const updatedArticle = {
-      ...existingArticle,
-      title,
-      content,
-      updatedAt: new Date().toISOString()
-    };
+    const updatedArticle = articleService.updateArticle(req.params.id, req.body);
 
-    fs.writeFileSync(filePath, JSON.stringify(updatedArticle, null, 2));
-    console.log(`Article updated: ${filePath}`);
+    // WebSocket notifications
+    socketService.sendNotification(req.params.id, `Article "${req.body.title}" was updated`);
+    socketService.emitToArticle(req.params.id, 'article-updated', updatedArticle);
+
     res.json(updatedArticle);
   } catch (err) {
-    console.error('Failed to update article:', err);
-    res.status(500).json({ error: 'Failed to update article' });
+    if (err.message === 'Article not found') {
+      res.status(404).json({ error: err.message });
+    } else {
+      res.status(400).json({ error: err.message });
+    }
   }
 });
 
 // Delete existing article
 app.delete('/articles/:id', (req, res) => {
-  const articleId = req.params.id;
-  const filePath = path.join(DATA_DIR, `${articleId}.json`);
-
-  if (!fs.existsSync(filePath)) {
-    return res.status(404).json({ error: 'Article not found' });
-  }
-
   try {
-    fs.unlinkSync(filePath);
-    console.log(`Article deleted: ${filePath}`);
+    articleService.deleteArticle(req.params.id);
     res.status(204).send();
   } catch (err) {
-    console.error('Failed to delete article:', err);
-    res.status(500).json({ error: 'Failed to delete article' });
+    if (err.message === 'Article not found') {
+      res.status(404).json({ error: err.message });
+    } else {
+      res.status(500).json({ error: err.message });
+    }
   }
 });
 
-app.listen(PORT, () => {
+// Create attachment from article
+app.post('/articles/:id/attachments', handleFileUpload, (req, res) => {
+  try {
+    const { article, attachments } = articleService.addAttachments(req.params.id, req.files);
+    
+    // WebSocket notifications
+    socketService.emitToArticle(req.params.id, 'article-updated', article);
+    socketService.sendNotification(req.params.id, 
+      attachments.length === 1 
+        ? `File attached: ${attachments[0].originalName}`
+        : `${attachments.length} files attached`
+    );
+
+    res.json({ attachments });
+  } catch (err) {
+    // Delete any files that might have been uploaded before error
+    if (req.files && req.files.length > 0) {
+      req.files.forEach(file => {
+        const filePath = path.join(__dirname, 'uploads', file.filename);
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+        }
+      });
+    }
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Remove attachment from article
+app.delete('/articles/:id/attachments/:attachmentId', (req, res) => {
+  try {
+    const attachment = articleService.removeAttachment(req.params.id, req.params.attachmentId);
+
+    // WebSocket notifications
+    socketService.sendNotification(req.params.id, `Attachment removed: ${attachment.originalName}`);
+    
+    const article = articleService.getArticleById(req.params.id);
+    socketService.emitToArticle(req.params.id, 'article-updated', article);
+
+    res.status(204).send();
+  } catch (err) {
+    if (err.message === 'Article not found' || err.message === 'Attachment not found') {
+      res.status(404).json({ error: err.message });
+    } else {
+      res.status(500).json({ error: err.message });
+    }
+  }
+});
+
+// Global error handling middleware
+app.use((error, req, res, next) => {
+  console.error('Global error handler:', error);
+  if (error.code === 'LIMIT_FILE_SIZE') {
+    return res.status(400).json({ error: 'File size too large. Maximum 10MB allowed.' });
+  }
+  if (error.message.includes('Invalid file type')) {
+    return res.status(400).json({ error: error.message });
+  }
+  
+  res.status(500).json({ error: 'Internal server error: ' + error.message });
+});
+
+server.listen(PORT, () => {
   console.log(`Server running at http://localhost:${PORT}`);
 });

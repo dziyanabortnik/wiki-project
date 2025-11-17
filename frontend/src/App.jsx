@@ -3,6 +3,7 @@ import ArticleList from './components/ArticleList';
 import ArticleForm from './components/ArticleForm';
 import ArticleView from './components/ArticleView';
 import ArticleEdit from './components/ArticleEdit';
+import NotificationManager from './components/NotificationManager';
 
 export default function App() {
   return (
@@ -13,6 +14,8 @@ export default function App() {
         <Route path="/view/:id" element={<ArticleView />} />
         <Route path="/edit/:id" element={<ArticleEdit />} />
       </Routes>
+
+      <NotificationManager/>
     </Router>
   );
 }
