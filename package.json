@@ -5,7 +5,10 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "concurrently \"npm run start --prefix backend\" \"npm run dev --prefix frontend\""
+    "start": "concurrently \"npm run start --prefix backend\" \"npm run dev --prefix frontend\"",
+    "migrate": "node backend/scripts/migrate.js",
+    "dev": "node backend/server.js",
+    "setup-db": "npm run migrate"
   },
   "repository": {
     "type": "git",
@@ -19,10 +22,15 @@
   },
   "homepage": "https://github.com/dziyanabortnik/wiki-project#readme",
   "devDependencies": {
-    "concurrently": "^9.2.1"
+    "concurrently": "^9.2.1",
+    "sequelize-cli": "^6.6.3"
   },
   "dependencies": {
+    "dotenv": "^17.2.3",
+    "pg": "^8.16.3",
+    "pg-hstore": "^2.3.4",
     "react-quill": "^2.0.0",
-    "react-router-dom": "^7.9.4"
+    "react-router-dom": "^7.9.4",
+    "sequelize": "^6.37.7"
   }
 }

@@ -10,6 +10,7 @@ A full-stack application for creating and managing articles with a WYSIWYG edito
 - Edit existing articles
 - Cancel editing
 - Delete articles
+- Database Storage
 - Articles save automatically as files
 - File Attachments: Upload images and PDFs to articles
 - Real-Time Notifications: Live updates when articles are modified
@@ -18,6 +19,7 @@ A full-stack application for creating and managing articles with a WYSIWYG edito
 
 **Frontend:** React, React Router, React Quill, Vite  
 **Backend:** Node.js, Express.js
+**Database:** PostgreSQL with Sequelize ORM
 
 ## Architecture & Code Quality
 
@@ -25,12 +27,32 @@ A full-stack application for creating and managing articles with a WYSIWYG edito
 - **Error Handling**: Comprehensive validation on both frontend and backend
 - **Real-Time Communication**: WebSocket integration for live updates
 - **File Management**: Multer middleware for secure file uploads
+- **Database Models**: Sequelize ORM with proper data validation and indexes
 
 ## Installation & Setup
 
 ### What you need
 - Node.js (version 14 or higher)
 - npm
+- PostgreSQL database
+
+### Database Setup
+1. Create PostgreSQL database:
+```bash
+createdb wiki_dev
+```
+
+2. Set up environment variables in .env file:
+DB_USERNAME=your_username
+DB_PASSWORD=your_password
+DB_NAME=wiki_dev
+DB_HOST=localhost
+DB_PORT=5432
+
+3. Run database setup:
+```bash
+node backend/scripts/migrate.js
+```
 
 ### Quick Start
 ```bash
@@ -92,3 +114,4 @@ npm run dev
 - **File Type Validation**: Only allowed file formats can be uploaded
 - **User Feedback**: Clear error messages and loading states
 - **Real-Time Notifications**: Live alerts for article changes and file operations
+- **Database Constraints**: Data integrity enforced at database level
