@@ -11,7 +11,6 @@ A full-stack application for creating and managing articles with a WYSIWYG edito
 - Cancel editing
 - Delete articles
 - Database Storage
-- Articles save automatically as files
 - File Attachments: Upload images and PDFs to articles
 - Real-Time Notifications: Live updates when articles are modified
 
@@ -42,7 +41,7 @@ A full-stack application for creating and managing articles with a WYSIWYG edito
 createdb wiki_dev
 ```
 
-2. Set up environment variables in .env file:
+2. Set up environment variables in backend/.env file:
 DB_USERNAME=your_username
 DB_PASSWORD=your_password
 DB_NAME=wiki_dev
@@ -51,7 +50,7 @@ DB_PORT=5432
 
 3. Run database setup:
 ```bash
-node backend/scripts/migrate.js
+npm run setup-db
 ```
 
 ### Quick Start
@@ -66,6 +65,7 @@ npm run start
 ```bash
 cd backend
 npm install
+npm run migrate  
 npm start
 ```
 

@@ -6,7 +6,7 @@ const { handleFileUpload } = require('./middleware/upload');
 const SocketService = require('./services/socketService');
 const ArticleService = require('./services/articleService');
 const http = require('http');
-require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
+require('dotenv').config();
 const { sequelize } = require('./config/database');
 const Article = require('./models/article');
 
