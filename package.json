@@ -5,7 +5,10 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "concurrently \"npm run start --prefix backend\" \"npm run dev --prefix frontend\""
+    "start": "concurrently \"npm run start --prefix backend\" \"npm run dev --prefix frontend\"",
+    "migrate": "npm run migrate --prefix backend",
+    "dev": "npm run dev --prefix frontend",
+    "setup-db": "npm run migrate --prefix backend"
   },
   "repository": {
     "type": "git",
@@ -20,9 +23,5 @@
   "homepage": "https://github.com/dziyanabortnik/wiki-project#readme",
   "devDependencies": {
     "concurrently": "^9.2.1"
-  },
-  "dependencies": {
-    "react-quill": "^2.0.0",
-    "react-router-dom": "^7.9.4"
   }
 }

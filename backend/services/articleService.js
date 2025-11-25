@@ -1,220 +1,137 @@
-const fs = require("fs");
-const path = require("path");
+const fs = require('fs');
+const path = require('path');
+const { Op } = require('sequelize');
+const { validateArticleData, validateAttachmentFiles } = require('../utils/validators');
+const { handleArticleNotFound, handleAttachmentNotFound } = require('../utils/errorHandlers');
+const { deleteAttachmentFiles, createAttachmentObjects } = require('../utils/fileHelpers');
 
 class ArticleService {
-  constructor(dataDir, uploadDir) {
-    this.DATA_DIR = dataDir;
+  constructor(ArticleModel, uploadDir) {
+    this.Article = ArticleModel;
     this.UPLOAD_DIR = uploadDir;
     this.ensureDirectories();
   }
 
   ensureDirectories() {
-    if (!fs.existsSync(this.DATA_DIR)) {
-      fs.mkdirSync(this.DATA_DIR, { recursive: true });
-    }
     if (!fs.existsSync(this.UPLOAD_DIR)) {
       fs.mkdirSync(this.UPLOAD_DIR, { recursive: true });
     }
   }
 
-  getAllArticles() {
+  async getAllArticles() {
     try {
-      if (!fs.existsSync(this.DATA_DIR)) {
-        return [];
-      }
+      const articles = await this.Article.findAll({
+        attributes: ['id', 'title', 'updatedAt'],
+        order: [['updatedAt', 'DESC']]
+      });
 
-      const files = fs.readdirSync(this.DATA_DIR);
-      const articles = files
-        .filter((file) => file.endsWith(".json"))
-        .map((file) => {
-          try {
-            const content = fs.readFileSync(
-              path.join(this.DATA_DIR, file),
-              "utf8"
-            );
-            const articleData = JSON.parse(content);
-            return {
-              id: path.basename(file, ".json"),
-              title: articleData.title,
-              attachments: articleData.attachments || [],
-            };
-          } catch (err) {
-            return null;
-          }
-        })
-        .filter(Boolean);
-
-      return articles;
+      return articles.map(article => ({
+        id: article.id,
+        title: article.title,
+        attachments: article.attachments || []
+      }));
     } catch (err) {
       throw new Error("Failed to read articles");
     }
   }
 
-  getArticleById(id) {
-    const filePath = path.join(this.DATA_DIR, `${id}.json`);
-
-    if (!fs.existsSync(filePath)) {
-      throw new Error("Article not found");
-    }
-
+  async getArticleById(id) {
     try {
-      const content = fs.readFileSync(filePath, "utf8");
-      return JSON.parse(content);
+      const article = await this.Article.findByPk(id);
+      handleArticleNotFound(article, id);
+      return article;
     } catch (err) {
+      if (err.message === "Article not found") {
+        throw err;
+      }
       throw new Error("Failed to read article");
     }
   }
 
-  createArticle(articleData) {
-    const { title, content } = articleData;
-
-    if (!title || !content) {
-      throw new Error("Title and content are required");
-    }
-
-    const id = Date.now().toString();
-    const article = {
-      id,
-      title,
-      content,
-      attachments: [],
-      createdAt: new Date().toISOString(),
-    };
-
-    const filePath = path.join(this.DATA_DIR, `${id}.json`);
+  async createArticle(articleData) {
+    validateArticleData(articleData);
 
     try {
-      fs.writeFileSync(filePath, JSON.stringify(article, null, 2));
+      const article = await this.Article.create({
+        title: articleData.title,
+        content: articleData.content,
+        attachments: []
+      });
       return article;
     } catch (err) {
       throw new Error("Failed to save article");
     }
   }
 
-  updateArticle(id, updateData) {
-    const { title, content } = updateData;
-    const filePath = path.join(this.DATA_DIR, `${id}.json`);
-
-    if (!fs.existsSync(filePath)) {
-      throw new Error("Article not found");
-    }
-
-    if (!title || !content) {
-      throw new Error("Title and content are required");
-    }
+  async updateArticle(id, updateData) {
+    validateArticleData(updateData);
 
     try {
-      const existingContent = fs.readFileSync(filePath, "utf8");
-      const existingArticle = JSON.parse(existingContent);
+      const article = await this.Article.findByPk(id);
+      handleArticleNotFound(article, id);
 
-      const updatedArticle = {
-        ...existingArticle,
-        title,
-        content,
-        updatedAt: new Date().toISOString(),
-      };
+      const updatedArticle = await article.update({
+        title: updateData.title,
+        content: updateData.content
+      });
 
-      fs.writeFileSync(filePath, JSON.stringify(updatedArticle, null, 2));
       return updatedArticle;
     } catch (err) {
+      if (err.message === "Article not found") {
+        throw err;
+      }
       throw new Error("Failed to update article");
     }
   }
 
-  deleteArticle(id) {
-    const filePath = path.join(this.DATA_DIR, `${id}.json`);
-
-    if (!fs.existsSync(filePath)) {
-      throw new Error("Article not found");
-    }
-
+  async deleteArticle(id) {
     try {
-      const article = JSON.parse(fs.readFileSync(filePath, "utf8"));
+      const article = await this.Article.findByPk(id);
+      handleArticleNotFound(article, id);
 
-      // Delete attachment files
-      if (article.attachments) {
-        article.attachments.forEach((attachment) => {
-          const diskFile = path.join(this.UPLOAD_DIR, attachment.filename);
-          if (fs.existsSync(diskFile)) {
-            fs.unlinkSync(diskFile);
-          }
-        });
-      }
-
-      fs.unlinkSync(filePath);
+      deleteAttachmentFiles(article.attachments, this.UPLOAD_DIR);
+      await article.destroy();
+      
+      return true;
     } catch (err) {
+      if (err.message === "Article not found") {
+        throw err;
+      }
       throw new Error("Failed to delete article");
     }
   }
 
-  addAttachments(articleId, files) {
-    const filePath = path.join(this.DATA_DIR, `${articleId}.json`);
-
-    if (!fs.existsSync(filePath)) {
-      throw new Error("Article not found");
-    }
-
-    if (!files || files.length === 0) {
-      throw new Error("No files uploaded");
-    }
-
-    const allowedTypes = [
-      "image/jpeg",
-      "image/jpg",
-      "image/png",
-      "image/gif",
-      "image/webp",
-      "application/pdf",
-    ];
-
-    const invalidFiles = files.filter(
-      (file) => !allowedTypes.includes(file.mimetype)
-    );
-    if (invalidFiles.length > 0) {
-      throw new Error(
-        `Invalid file types: ${invalidFiles
-          .map((f) => f.originalname)
-          .join(", ")}. Only images and PDFs are allowed.`
-      );
-    }
+  async addAttachments(articleId, files) {
+    validateAttachmentFiles(files);
 
     try {
-      const article = JSON.parse(fs.readFileSync(filePath, "utf8"));
+      const article = await this.Article.findByPk(articleId);
+      handleArticleNotFound(article, articleId);
 
-      const newAttachments = files.map((file) => ({
-        id: Date.now() + "-" + Math.round(Math.random() * 1e9),
-        filename: file.filename,
-        originalName: file.originalname,
-        path: `/uploads/${file.filename}`,
-        mimetype: file.mimetype,
-        size: file.size,
-        uploadedAt: new Date().toISOString(),
-      }));
+      const newAttachments = createAttachmentObjects(files);
+      const currentAttachments = article.attachments || [];
+      const updatedAttachments = [...currentAttachments, ...newAttachments];
 
-      article.attachments = [...(article.attachments || []), ...newAttachments];
-      article.updatedAt = new Date().toISOString();
+      await article.update({
+        attachments: updatedAttachments
+      });
 
-      fs.writeFileSync(filePath, JSON.stringify(article, null, 2));
       return { article, attachments: newAttachments };
     } catch (err) {
+      if (err.message === "Article not found") {
+        throw err;
+      }
       throw new Error("Failed to add attachments: " + err.message);
     }
   }
 
-  removeAttachment(articleId, attachmentId) {
-    const filePath = path.join(this.DATA_DIR, `${articleId}.json`);
-
-    if (!fs.existsSync(filePath)) {
-      throw new Error("Article not found");
-    }
-
+  async removeAttachment(articleId, attachmentId) {
     try {
-      const article = JSON.parse(fs.readFileSync(filePath, "utf8"));
-      const attachment = article.attachments.find((a) => a.id == attachmentId);
+      const article = await this.Article.findByPk(articleId);
+      handleArticleNotFound(article, articleId);
 
-      if (!attachment) {
-        throw new Error("Attachment not found");
-      }
+      const attachment = (article.attachments || []).find((a) => a.id == attachmentId);
+      handleAttachmentNotFound(attachment, attachmentId);
 
       // Delete physical file
       const diskFile = path.join(this.UPLOAD_DIR, attachment.filename);
@@ -222,15 +139,20 @@ class ArticleService {
         fs.unlinkSync(diskFile);
       }
 
-      // Remove from article
-      article.attachments = article.attachments.filter(
+      // Remove from article attachments
+      const updatedAttachments = (article.attachments || []).filter(
         (a) => a.id != attachmentId
       );
-      article.updatedAt = new Date().toISOString();
-      fs.writeFileSync(filePath, JSON.stringify(article, null, 2));
+
+      await article.update({
+        attachments: updatedAttachments
+      });
 
       return attachment;
     } catch (err) {
+      if (err.message === "Article not found" || err.message === "Attachment not found") {
+        throw err;
+      }
       throw new Error("Failed to remove attachment");
     }
   }

@@ -6,16 +6,12 @@ const { handleFileUpload } = require('./middleware/upload');
 const SocketService = require('./services/socketService');
 const ArticleService = require('./services/articleService');
 const http = require('http');
+require('dotenv').config();
+const { sequelize } = require('./config/database');
+const Article = require('./models/article');
 
 const app = express();
 const server = http.createServer(app);
-
-// Initialize services
-const socketService = new SocketService(server);
-const articleService = new ArticleService(
-  path.join(__dirname, 'data'),
-  path.join(__dirname, 'uploads')
-);
 
 const PORT = 3000;
 
@@ -28,10 +24,26 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
+sequelize.authenticate()
+  .then(() => {
+    console.log('Database connection established successfully.');
+  })
+  .catch(err => {
+    console.error('Unable to connect to the database:', err);
+    process.exit(1);
+  });
+
+// Initialize services
+const socketService = new SocketService(server);
+const articleService = new ArticleService(
+  Article,
+  path.join(__dirname, 'uploads')
+);
+
 // Get all articles
-app.get('/articles', (req, res) => {
+app.get('/articles', async (req, res) => {
   try {
-    const articles = articleService.getAllArticles();
+    const articles = await articleService.getAllArticles();
     res.json(articles);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -39,9 +51,9 @@ app.get('/articles', (req, res) => {
 });
 
 // Get specific article by ID
-app.get('/articles/:id', (req, res) => {
+app.get('/articles/:id', async (req, res) => {
   try {
-    const article = articleService.getArticleById(req.params.id);
+    const article = await articleService.getArticleById(req.params.id);
     res.json(article);
   } catch (err) {
     if (err.message === 'Article not found') {
@@ -53,9 +65,9 @@ app.get('/articles/:id', (req, res) => {
 });
 
 // Create new article
-app.post('/articles', (req, res) => {
+app.post('/articles', async (req, res) => {
   try {
-    const article = articleService.createArticle(req.body);
+    const article = await articleService.createArticle(req.body);
     res.status(201).json(article);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -63,9 +75,9 @@ app.post('/articles', (req, res) => {
 });
 
 // Update existing article
-app.put('/articles/:id', (req, res) => {
+app.put('/articles/:id', async (req, res) => {
   try {
-    const updatedArticle = articleService.updateArticle(req.params.id, req.body);
+    const updatedArticle = await articleService.updateArticle(req.params.id, req.body);
 
     // WebSocket notifications
     socketService.sendNotification(req.params.id, `Article "${req.body.title}" was updated`);
@@ -82,9 +94,9 @@ app.put('/articles/:id', (req, res) => {
 });
 
 // Delete existing article
-app.delete('/articles/:id', (req, res) => {
+app.delete('/articles/:id', async (req, res) => {
   try {
-    articleService.deleteArticle(req.params.id);
+    await articleService.deleteArticle(req.params.id);
     res.status(204).send();
   } catch (err) {
     if (err.message === 'Article not found') {
@@ -96,9 +108,9 @@ app.delete('/articles/:id', (req, res) => {
 });
 
 // Create attachment from article
-app.post('/articles/:id/attachments', handleFileUpload, (req, res) => {
+app.post('/articles/:id/attachments', handleFileUpload, async (req, res) => {
   try {
-    const { article, attachments } = articleService.addAttachments(req.params.id, req.files);
+    const { article, attachments } = await articleService.addAttachments(req.params.id, req.files);
     
     // WebSocket notifications
     socketService.emitToArticle(req.params.id, 'article-updated', article);
@@ -124,14 +136,14 @@ app.post('/articles/:id/attachments', handleFileUpload, (req, res) => {
 });
 
 // Remove attachment from article
-app.delete('/articles/:id/attachments/:attachmentId', (req, res) => {
+app.delete('/articles/:id/attachments/:attachmentId', async (req, res) => {
   try {
-    const attachment = articleService.removeAttachment(req.params.id, req.params.attachmentId);
+    const attachment = await articleService.removeAttachment(req.params.id, req.params.attachmentId);
 
     // WebSocket notifications
     socketService.sendNotification(req.params.id, `Attachment removed: ${attachment.originalName}`);
     
-    const article = articleService.getArticleById(req.params.id);
+    const article = await articleService.getArticleById(req.params.id);
     socketService.emitToArticle(req.params.id, 'article-updated', article);
 
     res.status(204).send();
