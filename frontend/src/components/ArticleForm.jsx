@@ -1,9 +1,10 @@
-import { useState, forwardRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import ReactQuill from 'react-quill';
-import 'react-quill/dist/quill.snow.css';
-import '../App.css'
-import AttachmentManager from './AttachmentManager';
+import { useState, forwardRef, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import ReactQuill from "react-quill";
+import "react-quill/dist/quill.snow.css";
+import "../App.css";
+import AttachmentManager from "./AttachmentManager";
+import { workspaceNames } from '../constants/workspaces';
 
 const QuillEditor = forwardRef(({ value, onChange }, ref) => (
   <ReactQuill ref={ref} value={value} onChange={onChange} />
@@ -12,10 +13,21 @@ const QuillEditor = forwardRef(({ value, onChange }, ref) => (
 export default function ArticleForm() {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
+  const [selectedWorkspace, setSelectedWorkspace] = useState("uncategorized");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [attachments, setAttachments] = useState([]);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  // Auto-select workspace from URL parameter
+  useEffect(() => {
+    const workspaceFromUrl = searchParams.get('workspace');
+    if (workspaceFromUrl && workspaceNames[workspaceFromUrl]) {
+      setSelectedWorkspace(workspaceFromUrl);
+      console.log('Auto-selected workspace from URL:', workspaceFromUrl);
+    }
+  }, [searchParams]);
 
   // Cleanup object URLs on unmount
   useEffect(() => {
@@ -54,11 +66,16 @@ export default function ArticleForm() {
       const articleRes = await fetch('http://localhost:3000/articles', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, content }),
+        body: JSON.stringify({
+          title,
+          content,
+          workspaceId: selectedWorkspace || null,
+        }),
       });
 
       if (!articleRes.ok) {
         const errorText = await articleRes.text();
+        console.error("Server response:", errorText);
         throw new Error(errorText || `Failed to create article (${articleRes.status})`);
       }
 
@@ -122,6 +139,22 @@ export default function ArticleForm() {
           className='create-input'
         />
         <QuillEditor value={content} onChange={setContent} />
+
+        <div className="workspace-selector">
+          <label>Select Workspace: </label>
+
+          <select
+            value={selectedWorkspace}
+            onChange={(e) => setSelectedWorkspace(e.target.value)}
+            required
+          >
+            <option value="uncategorized">Uncategorized</option>
+            <option value="nature">Nature & Science</option>
+            <option value="culture">Culture & Arts</option>
+            <option value="tech">Technology</option>
+            <option value="education">Education</option>
+          </select>
+        </div>
 
         <AttachmentManager
           articleId={null}

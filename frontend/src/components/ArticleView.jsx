@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate  } from 'react-router-dom';
 import { useArticleActions } from '../hooks/useArticleActions';
 import socket from '../services/socket';
+import { getWorkspaceName } from '../constants/workspaces';
+import CommentsSection from './CommentsSection';
 
 export default function ArticleView() {
   const { id } = useParams();
@@ -72,7 +74,15 @@ export default function ArticleView() {
 
   return (
     <div className='view'>
-      <h2>{article.title}</h2>
+      <div className="article-header">
+        <h2>{article.title}</h2>
+        <div className="article-workspace">
+          <span className="workspace-badge">
+            {getWorkspaceName(article.workspaceId)}
+          </span>
+        </div>
+      </div>
+      
       <div dangerouslySetInnerHTML={{ __html: article.content }} className='view-article'/>
       
       {article.attachments && article.attachments.length > 0 && (
@@ -90,6 +100,8 @@ export default function ArticleView() {
           </div>
         </div>
       )}
+
+      <CommentsSection articleId={id} />
 
       <div className="article-actions">
         <Link to={`/edit/${article.id}`} className="edit-link">Edit Article</Link>

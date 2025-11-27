@@ -12,7 +12,23 @@ const handleAttachmentNotFound = (attachment, attachmentId) => {
   return attachment;
 };
 
+const handleCommentNotFound = (comment, id) => {
+  if (!comment) {
+    throw new Error("Comment not found");
+  }
+  return comment;
+};
+
+const handleWorkspaceNotFound = (workspace, id) => {
+  if (!workspace) {
+    throw new Error("Workspace not found");
+  }
+  return workspace;
+};
+
 module.exports = {
   handleArticleNotFound,
-  handleAttachmentNotFound
+  handleAttachmentNotFound,
+  handleCommentNotFound,
+  handleWorkspaceNotFound
 };

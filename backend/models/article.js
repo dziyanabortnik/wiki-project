@@ -1,6 +1,7 @@
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/database');
 
+// Article model - represents wiki articles
 const Article = sequelize.define('Article', {
   id: {
     type: DataTypes.UUID,
@@ -20,6 +21,10 @@ const Article = sequelize.define('Article', {
     validate: {
       notEmpty: true
     }
+  },
+  workspaceId: {
+    type: DataTypes.STRING,
+    allowNull: true
   },
   attachments: {
     type: DataTypes.JSONB,

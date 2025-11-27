@@ -1,29 +1,45 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useArticleActions } from '../hooks/useArticleActions';
+import WorkspaceTabs from './WorkspaceTabs';
+import { workspaceNames, getWorkspaceName } from '../constants/workspaces';
 
 export default function ArticleList() {
   const [articles, setArticles] = useState([]);
+  const [selectedWorkspace, setSelectedWorkspace] = useState(null);
+  const [loading, setLoading] = useState(false);
   const { deleteArticle } = useArticleActions();
 
-  // Fetch articles list on component mount
+  // Fetch articles list when component mounts or workspace changes
   useEffect(() => {
-    fetch('http://localhost:3000/articles')
-      .then(res => res.json())
-      .then(data => {
-        // Handle case where response is not an array
-        if (!Array.isArray(data)) {
-          console.warn('Expected array but got', data);
-          setArticles([]);
-        } else {
-          setArticles(data);
-        }
-      })
-      .catch(err => {
-        console.error('Failed to fetch articles', err);
-        setArticles([]);
-      });
-  }, []);
+    loadArticles();
+  }, [selectedWorkspace]);
+
+  const loadArticles = async () => {
+    setLoading(true);
+    try {
+      const baseUrl = 'http://localhost:3000/articles';
+      const url = selectedWorkspace !== null 
+        ? `${baseUrl}?workspaceId=${selectedWorkspace}`
+        : baseUrl;
+
+      console.log('Fetching from URL:', url);
+      
+      const res = await fetch(url);
+      console.log('Response status:', res.status);
+      
+      if (!res.ok) throw new Error('Failed to fetch articles');
+      
+      const data = await res.json();
+      console.log('Received articles:', data);
+      setArticles(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error('Failed to fetch articles:', err);
+      setArticles([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleDelete = async (id, title) => {
     await deleteArticle(id, title, () => {
@@ -31,11 +47,34 @@ export default function ArticleList() {
     });
   };
 
+  // Generate create article URL with workspace preselected
+  const getCreateArticleUrl = () => {
+    if (selectedWorkspace) {
+      return `/new?workspace=${selectedWorkspace}`;
+    }
+    return '/new';
+  };
+
+  const pageTitle = selectedWorkspace === null 
+    ? 'All Articles' 
+    : getWorkspaceName(selectedWorkspace);
+
   return (
     <div className='list'>
-      <h2>Articles</h2>
+      <WorkspaceTabs
+        currentWorkspace={selectedWorkspace}
+        onWorkspaceChange={setSelectedWorkspace}
+      />
 
-      <Link to='/new' className='create-new-btn'>Create New Article</Link>
+      <div className="list-header">
+        <h2>{pageTitle} ({articles.length})</h2>
+        
+        <Link to={getCreateArticleUrl()} className='create-new-btn'>
+          {articles.length === 0 ? 'Create First Article' : 'Create New Article'}
+        </Link>
+      </div>
+
+      {loading && <div className="loading">Loading articles...</div>}
 
       <ul>
         {articles.map(a => (
@@ -49,6 +88,12 @@ export default function ArticleList() {
           </li>
         ))}
       </ul>
+
+      {!loading && articles.length === 0 && (
+        <div className="empty-state">
+          <p>No articles found in this workspace.</p>
+        </div>
+      )}
     </div>
   );
 }

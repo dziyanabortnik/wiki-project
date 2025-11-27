@@ -39,7 +39,29 @@ const validateAttachmentFiles = (files) => {
   }
 };
 
+const validateCommentData = (commentData) => {
+  const { content } = commentData;
+  
+  if (!content || !content.trim()) {
+    throw new Error("Comment content is required");
+  }
+  
+  return true;
+};
+
+const validateWorkspaceData = (workspaceData) => {
+  const { name } = workspaceData;
+  
+  if (!name || !name.trim()) {
+    throw new Error("Workspace name is required");
+  }
+  
+  return true;
+};
+
 module.exports = {
   validateArticleData,
-  validateAttachmentFiles
+  validateAttachmentFiles,
+  validateCommentData,
+  validateWorkspaceData
 };

@@ -10,7 +10,9 @@ A full-stack application for creating and managing articles with a WYSIWYG edito
 - Edit existing articles
 - Cancel editing
 - Delete articles
-- Database Storage
+- Workspace Organization: Organize articles into different workspaces/categories
+- Comments System: Add and manage comments on articles
+- Database Storage: All data persisted in PostgreSQL database
 - File Attachments: Upload images and PDFs to articles
 - Real-Time Notifications: Live updates when articles are modified
 
@@ -19,6 +21,7 @@ A full-stack application for creating and managing articles with a WYSIWYG edito
 **Frontend:** React, React Router, React Quill, Vite  
 **Backend:** Node.js, Express.js
 **Database:** PostgreSQL with Sequelize ORM
+**Real-time:** Socket.IO for live updates
 
 ## Architecture & Code Quality
 
@@ -27,6 +30,14 @@ A full-stack application for creating and managing articles with a WYSIWYG edito
 - **Real-Time Communication**: WebSocket integration for live updates
 - **File Management**: Multer middleware for secure file uploads
 - **Database Models**: Sequelize ORM with proper data validation and indexes
+- **Service Layer**: Separated business logic (ArticleService, CommentService)
+- **Migrations**: Database schema versioning and reproducibility
+
+## Database Schema
+
+- **articles**: Stores article content, titles, workspace associations, and attachments metadata
+- **comments**: Stores user comments with article relationships and author information  
+- **workspaces**: Predefined categories for organizing articles (Nature, Technology, Culture, etc.)
 
 ## Installation & Setup
 
@@ -50,7 +61,7 @@ DB_PORT=5432
 
 3. Run database setup:
 ```bash
-npm run setup-db
+npm run migrate
 ```
 
 ### Quick Start
@@ -77,13 +88,27 @@ npm run dev
 ```
 
 ## API Endpoints
+
+### Articles
 - GET /articles - List all articles
 - GET /articles/:id - Get specific article
 - POST /articles - Create new article
 - PUT /articles/:id - Update existing article
 - DELETE /articles/:id - Delete article
+
+### Attachments
 - POST /articles/:id/attachments - Upload files to article
 - DELETE /articles/:id/attachments/:attachmentId - Remove attachment
+
+### Comments
+- GET /articles/:id/comments - Get comments for article
+- POST /articles/:id/comments - Add new comment
+- PUT /comments/:id - Update comment
+- DELETE /comments/:id - Delete comment
+
+### Workspaces
+- GET /workspaces - List all available workspaces
+- GET /workspaces/:id - Get specific workspace details
 
 ## WebSocket Events
 - join-article - Join article room for real-time updates
@@ -92,15 +117,18 @@ npm run dev
 
 ## Usage
 1. **View Articles**: Navigate to the home page to see all articles
-2. **Create Article**: Click "Create New Article" to open the editor
-3. **Write Content**: Use the WYSIWYG editor to format content
-4. **Add Attachments**: Upload images or PDF files (JPG, PNG, GIF, WebP, PDF only)
-5. **Save**: Submit the form to save article
-6. **Read**: Click any article title to view full content
-7. **Edit**: Click "Edit" while viewing an article to modify it
-8. **Cancel Editing**: Click "Cancel" to discard changes and return to previous page
-9. **Delete**: Click "Delete" to remove an article (with confirmation)
-10. **Real-Time Updates**: Receive notifications when other users modify articles
+2. **Filter by Workspace**: Use tabs to filter articles by category (All, Nature, Technology, Culture, Education, Uncategorized)
+3. **Create Article**: Click "Create New Article" to open the editor
+4. **Select Workspace**:: Choose appropriate category for your article
+5. **Write Content**: Use the WYSIWYG editor to format content
+6. **Add Attachments**: Upload images or PDF files (JPG, PNG, GIF, WebP, PDF only)
+7. **Save**: Submit the form to save article
+8. **Read**: Click any article title to view full content
+9. **Add Comments**: Write comments on articles with optional author name
+10. **Edit**: Click "Edit" while viewing an article to modify it
+11. **Cancel Editing**: Click "Cancel" to discard changes and return to previous page
+12. **Delete**: Click "Delete" to remove an article (with confirmation)
+13. **Real-Time Updates**: Receive notifications when other users modify articles
 
 ## File Attachments
 - Supported formats: JPG, JPEG, PNG, GIF, WebP, PDF
@@ -108,10 +136,19 @@ npm run dev
 - Click attachments to view in new window/tab
 - Automatic cleanup when articles are deleted
 
+## Workspace Categories
+- Nature & Science: Articles about environment, animals, science
+- Technology: Programming, IT, innovations
+- Culture & Arts: Traditions, art, history, humanities
+- Education: Learning materials, tutorials
+- Uncategorized: Articles without specific category
+
 ## Validation & Error Handling
 - **Article Existence Validation**: Cannot edit or delete non-existent articles
 - **Required Fields**: Title and content validation on both frontend and backend
 - **File Type Validation**: Only allowed file formats can be uploaded
+- **Comment Validation**: Content required for comments
+- **Workspace Validation**: Articles must belong to valid workspace
 - **User Feedback**: Clear error messages and loading states
 - **Real-Time Notifications**: Live alerts for article changes and file operations
 - **Database Constraints**: Data integrity enforced at database level

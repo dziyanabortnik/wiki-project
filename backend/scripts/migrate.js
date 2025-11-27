@@ -3,41 +3,39 @@ require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
 const { sequelize } = require("../config/database");
 
+require("../models/article");
+require("../models/comment");
+require("../models/workspace");
+
 async function runMigrations() {
   try {
     await sequelize.authenticate();
     console.log("Database connection established successfully.");
 
-    // Create migration tracking table
-    await sequelize.query(`
-      CREATE TABLE IF NOT EXISTS "SequelizeMeta" (
-        name VARCHAR(255) NOT NULL PRIMARY KEY
-      );
-    `);
+    // Sync all models with database
+    await sequelize.sync({ alter: true });
+    
+    const Workspace = require("../models/workspace");
+    
+    // Populate workspaces with initial data
+    const workspaces = [
+      { id: 'uncategorized', name: 'Uncategorized' },
+      { id: 'nature', name: 'Nature & Science' },
+      { id: 'culture', name: 'Culture & Arts' },
+      { id: 'tech', name: 'Technology' },
+      { id: 'education', name: 'Education' }
+    ];
 
-    // Check if migration already applied
-    const [executedMigrations] = await sequelize.query(
-      'SELECT name FROM "SequelizeMeta" WHERE name = $1',
-      { bind: ["001-create-articles.js"] }
-    );
-
-    if (executedMigrations.length === 0) {
-      console.log("Applying migration: 001-create-articles.js");
-
-      // Run the migration
-      const migration = require("../migrations/001-create-articles");
-      await migration.up(sequelize.getQueryInterface(), sequelize.Sequelize);
-
-      // Mark as completed
-      await sequelize.query('INSERT INTO "SequelizeMeta" (name) VALUES ($1)', {
-        bind: ["001-create-articles.js"],
+    // Create workspaces if they don't exist
+    for (const ws of workspaces) {
+      await Workspace.findOrCreate({
+        where: { id: ws.id },
+        defaults: ws
       });
-      
-      console.log("Migration applied successfully.");
-    } else {
-      console.log("Migration already applied. No changes needed.");
     }
-
+    
+    console.log("Workspaces populated successfully!");
+    console.log("All models synchronized successfully!");
     console.log("Database setup completed!");
   } catch (error) {
     console.error("Database setup failed:", error);
