@@ -55,7 +55,7 @@ class ArticleService {
       throw new Error("Failed to read articles");
     }
   }
-  
+
   async getArticleById(id) {
     try {
       const article = await this.Article.findByPk(id);
@@ -117,6 +117,11 @@ class ArticleService {
     try {
       const article = await this.Article.findByPk(id);
       handleArticleNotFound(article, id);
+
+      const Comment = require("../models/comment");
+      await Comment.destroy({
+        where: { articleId: id },
+      });
 
       deleteAttachmentFiles(article.attachments, this.UPLOAD_DIR);
       await article.destroy();
