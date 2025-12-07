@@ -52,7 +52,7 @@ A full-stack application for creating and managing articles with a WYSIWYG edito
 createdb wiki_dev
 ```
 
-2. Set up environment variables in backend/.env file:
+2. Set up environment variables in backend/.env.BackUp file:
 DB_USERNAME=your_username
 DB_PASSWORD=your_password
 DB_NAME=wiki_dev
@@ -61,13 +61,8 @@ DB_PORT=5432
 
 3. Run database setup:
 ```bash
+cd backend
 npm run migrate
-```
-
-### Quick Start
-```bash
-npm install
-npm run start
 ```
 
 ## Manual Setup
@@ -77,7 +72,7 @@ npm run start
 cd backend
 npm install
 npm run migrate  
-npm start
+npm run dev
 ```
 
 ### Frontend

@@ -1,29 +1,29 @@
-const fs = require("fs");
-const path = require("path");
-const {
-  validateArticleData,
-  validateAttachmentFiles,
-} = require("../utils/validators");
+const { ERRORS } = require("../constants/errorMessages");
 const {
   handleArticleNotFound,
   handleAttachmentNotFound,
 } = require("../utils/errorHandlers");
 const {
+  validateArticleData,
+  validateAttachmentFiles,
+} = require("../utils/validators");
+const {
   deleteAttachmentFiles,
   createAttachmentObjects,
 } = require("../utils/fileHelpers");
+const fs = require("fs");
+const path = require("path");
 
-// Service class for article business logic
 class ArticleService {
   constructor(ArticleModel, uploadDir) {
     this.Article = ArticleModel;
-    this.UPLOAD_DIR = uploadDir;
-    this.ensureDirectories();
+    this.uploadDir = uploadDir;
+    this.ensureUploadDirectory();
   }
 
-  ensureDirectories() {
-    if (!fs.existsSync(this.UPLOAD_DIR)) {
-      fs.mkdirSync(this.UPLOAD_DIR, { recursive: true });
+  ensureUploadDirectory() {
+    if (!fs.existsSync(this.uploadDir)) {
+      fs.mkdirSync(this.uploadDir, { recursive: true });
     }
   }
 
@@ -32,27 +32,22 @@ class ArticleService {
     try {
       const whereClause = workspaceId ? { workspaceId } : {};
 
-      console.log("Fetching articles with filter:", whereClause);
-
       const articles = await this.Article.findAll({
         where: whereClause,
         attributes: ["id", "title", "updatedAt", "workspaceId", "attachments"],
-        order: [["updatedAt", "DESC"]], // Show newest first
+        order: [["updatedAt", "DESC"]],
       });
-
-      console.log(
-        `Found ${articles.length} articles for workspace: ${workspaceId}`
-      );
 
       return articles.map((article) => ({
         id: article.id,
         title: article.title,
         attachments: article.attachments || [],
         workspaceId: article.workspaceId,
+        updatedAt: article.updatedAt,
       }));
     } catch (err) {
       console.error("Error fetching articles:", err);
-      throw new Error("Failed to read articles");
+      throw new Error(ERRORS.ARTICLE_FETCH_FAILED);
     }
   }
 
@@ -62,10 +57,10 @@ class ArticleService {
       handleArticleNotFound(article, id);
       return article;
     } catch (err) {
-      if (err.message === "Article not found") {
+      if (err.message === ERRORS.ARTICLE_NOT_FOUND) {
         throw err;
       }
-      throw new Error("Failed to read article");
+      throw new Error(ERRORS.ARTICLE_FETCH_FAILED);
     }
   }
 
@@ -79,7 +74,7 @@ class ArticleService {
       );
 
       const article = await this.Article.create({
-        title: articleData.title,
+        title: articleData.title.trim(),
         content: articleData.content,
         workspaceId: articleData.workspaceId || null,
         attachments: [],
@@ -87,7 +82,7 @@ class ArticleService {
       return article;
     } catch (err) {
       console.error("Database error:", err);
-      throw new Error("Failed to save article");
+      throw new Error(ERRORS.ARTICLE_CREATE_FAILED);
     }
   }
 
@@ -99,17 +94,17 @@ class ArticleService {
       handleArticleNotFound(article, id);
 
       const updatedArticle = await article.update({
-        title: updateData.title,
+        title: updateData.title.trim(),
         content: updateData.content,
         workspaceId: updateData.workspaceId || article.workspaceId,
       });
 
       return updatedArticle;
     } catch (err) {
-      if (err.message === "Article not found") {
+      if (err.message === ERRORS.ARTICLE_NOT_FOUND) {
         throw err;
       }
-      throw new Error("Failed to update article");
+      throw new Error(ERRORS.ARTICLE_UPDATE_FAILED);
     }
   }
 
@@ -123,15 +118,15 @@ class ArticleService {
         where: { articleId: id },
       });
 
-      deleteAttachmentFiles(article.attachments, this.UPLOAD_DIR);
+      deleteAttachmentFiles(article.attachments, this.uploadDir);
       await article.destroy();
 
       return true;
     } catch (err) {
-      if (err.message === "Article not found") {
+      if (err.message === ERRORS.ARTICLE_NOT_FOUND) {
         throw err;
       }
-      throw new Error("Failed to delete article");
+      throw new Error(ERRORS.ARTICLE_DELETE_FAILED);
     }
   }
 
@@ -152,10 +147,10 @@ class ArticleService {
 
       return { article, attachments: newAttachments };
     } catch (err) {
-      if (err.message === "Article not found") {
+      if (err.message === ERRORS.ARTICLE_NOT_FOUND) {
         throw err;
       }
-      throw new Error("Failed to add attachments: " + err.message);
+      throw new Error(ERRORS.ATTACHMENT_UPLOAD_FAILED);
     }
   }
 
@@ -170,7 +165,7 @@ class ArticleService {
       handleAttachmentNotFound(attachment, attachmentId);
 
       // Delete physical file
-      const diskFile = path.join(this.UPLOAD_DIR, attachment.filename);
+      const diskFile = path.join(this.uploadDir, attachment.filename);
       if (fs.existsSync(diskFile)) {
         fs.unlinkSync(diskFile);
       }
@@ -187,12 +182,37 @@ class ArticleService {
       return attachment;
     } catch (err) {
       if (
-        err.message === "Article not found" ||
-        err.message === "Attachment not found"
+        err.message === ERRORS.ARTICLE_NOT_FOUND ||
+        err.message === ERRORS.ATTACHMENT_NOT_FOUND
       ) {
         throw err;
       }
-      throw new Error("Failed to remove attachment");
+      throw new Error(ERRORS.ATTACHMENT_REMOVE_FAILED);
+    }
+  }
+
+  async getArticleWithComments(articleId) {
+    try {
+      const article = await this.Article.findByPk(articleId, {
+        include: [
+          {
+            model: require("../models/comment"),
+            as: "comments",
+            attributes: ["id", "content", "author", "createdAt", "updatedAt"],
+            order: [["createdAt", "ASC"]],
+          },
+        ],
+      });
+
+      if (!article) {
+        throw new Error(ERRORS.ARTICLE_NOT_FOUND);
+      }
+      return article;
+    } catch (err) {
+      if (err.message === ERRORS.ARTICLE_NOT_FOUND) {
+        throw err;
+      }
+      throw new Error("Failed to fetch article with comments");
     }
   }
 }

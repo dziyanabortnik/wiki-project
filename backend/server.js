@@ -2,39 +2,32 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const cors = require('cors');
+const http = require('http');
+
+// Config and middleware
 const { handleFileUpload } = require('./middleware/upload');
+const errorMiddleware = require('./middleware/errorMiddleware');
+require('dotenv').config({ path: '.env.BackUp' });
+
+// Services
 const SocketService = require('./services/socketService');
 const ArticleService = require('./services/articleService');
-const Comment = require('./models/comment');
 const CommentService = require('./services/commentService');
-const http = require('http');
-require('dotenv').config();
-const { sequelize } = require('./config/database');
-const { Article } = require('./models');
+const WorkspaceService = require('./services/workspaceService');
 
+// Database
+const { sequelize } = require('./config/database');
+const { Article, Comment, Workspace } = require('./models');
+
+// Constants
+const { ERRORS, HTTP_STATUS } = require('./constants/errorMessages');
+
+const databaseLogger = require('./utils/databaseLogger');
+
+// Initialize Express
 const app = express();
 const server = http.createServer(app);
-
-const PORT = 3000;
-
-// Middleware setup
-app.use(cors({
-  origin: ["http://localhost:5173", "http://localhost:5174"],
-  credentials: true
-}));
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-
-// Database connection
-sequelize.authenticate()
-  .then(() => {
-    console.log('Database connection established successfully.');
-  })
-  .catch(err => {
-    console.error('Unable to connect to the database:', err);
-    process.exit(1);
-  });
+const PORT = process.env.PORT || 3000;
 
 // Initialize services
 const socketService = new SocketService(server);
@@ -43,121 +36,148 @@ const articleService = new ArticleService(
   path.join(__dirname, 'uploads')
 );
 const commentService = new CommentService(Comment, Article);
+const workspaceService = new WorkspaceService(Workspace);
 
-// Get all workspaces (hardcoded for now)
-app.get('/workspaces', async (req, res) => {
+//MIDDLEWARE
+app.use(cors({
+  origin: ["http://localhost:5173", "http://localhost:5174"],
+  credentials: true
+}));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({ 
+    status: 'OK', 
+    timestamp: new Date().toISOString(),
+    version: '1.0.0'
+  });
+});
+
+// Database health check
+app.get('/health/db', async (req, res) => {
   try {
-    const workspaces = await Workspace.findAll({
-      order: [['name', 'ASC']]
+    await sequelize.authenticate();
+    res.json({ database: 'connected' });
+  } catch (err) {
+    res.status(500).json({ 
+      database: 'disconnected', 
+      error: err.message 
     });
-    res.json(workspaces);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
   }
 });
 
-// Get workspace by ID
-app.get('/workspaces/:id', async (req, res) => {
+// WORKSPACE ROUTES
+app.get('/workspaces', async (req, res, next) => {
   try {
-    const workspace = await Workspace.findByPk(req.params.id);
-    if (!workspace) {
-      return res.status(404).json({ error: 'Workspace not found' });
-    }
-    res.json(workspace);
+    const workspaces = await workspaceService.getAllWorkspaces();
+    res.status(HTTP_STATUS.OK).json(workspaces);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
-// Get all articles
-app.get('/articles', async (req, res) => {
+app.get('/workspaces/:id', async (req, res, next) => {
+  try {
+    const workspace = await workspaceService.getWorkspaceById(req.params.id);
+    res.status(HTTP_STATUS.OK).json(workspace);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ARTICLE ROUTES
+app.get('/articles', async (req, res, next) => {
   try {
     const { workspaceId } = req.query;
-    console.log('GET /articles with workspaceId:', workspaceId);
-    
     const articles = await articleService.getAllArticles(workspaceId);
-    res.json(articles);
+    res.status(HTTP_STATUS.OK).json(articles);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
-// Get specific article by ID
-app.get('/articles/:id', async (req, res) => {
+app.get('/articles/:id', async (req, res, next) => {
   try {
     const article = await articleService.getArticleById(req.params.id);
-    res.json(article);
+    res.status(HTTP_STATUS.OK).json(article);
   } catch (err) {
-    if (err.message === 'Article not found') {
-      res.status(404).json({ error: err.message });
-    } else {
-      res.status(500).json({ error: err.message });
-    }
+    next(err);
   }
 });
 
-// Create new article
-app.post('/articles', async (req, res) => {
+app.post('/articles', async (req, res, next) => {
   try {
     const article = await articleService.createArticle({
-      ...req.body,  
-      workspaceId: req.body.workspaceId || null});
-    res.status(201).json(article);
+      ...req.body,
+      workspaceId: req.body.workspaceId || null
+    });
+    res.status(HTTP_STATUS.CREATED).json(article);
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    next(err);
   }
 });
 
-// Update existing article
-app.put('/articles/:id', async (req, res) => {
+app.put('/articles/:id', async (req, res, next) => {
   try {
-    const updatedArticle = await articleService.updateArticle(req.params.id, req.body);
-
-    // WebSocket notifications
-    socketService.sendNotification(req.params.id, `Article "${req.body.title}" was updated`);
-    socketService.emitToArticle(req.params.id, 'article-updated', updatedArticle);
-
-    res.json(updatedArticle);
-  } catch (err) {
-    if (err.message === 'Article not found') {
-      res.status(404).json({ error: err.message });
-    } else {
-      res.status(400).json({ error: err.message });
-    }
-  }
-});
-
-// Delete existing article
-app.delete('/articles/:id', async (req, res) => {
-  try {
-    await articleService.deleteArticle(req.params.id);
-    res.status(204).send();
-  } catch (err) {
-    if (err.message === 'Article not found') {
-      res.status(404).json({ error: err.message });
-    } else {
-      res.status(500).json({ error: err.message });
-    }
-  }
-});
-
-// Create attachment from article
-app.post('/articles/:id/attachments', handleFileUpload, async (req, res) => {
-  try {
-    const { article, attachments } = await articleService.addAttachments(req.params.id, req.files);
-    
-    // WebSocket notifications
-    socketService.emitToArticle(req.params.id, 'article-updated', article);
-    socketService.sendNotification(req.params.id, 
-      attachments.length === 1 
-        ? `File attached: ${attachments[0].originalName}`
-        : `${attachments.length} files attached`
+    const updatedArticle = await articleService.updateArticle(
+      req.params.id, 
+      req.body
     );
 
-    res.json({ attachments });
+    // WebSocket notifications
+    socketService.sendNotification(
+      req.params.id, 
+      `Article "${req.body.title}" was updated`
+    );
+    socketService.emitToArticle(
+      req.params.id, 
+      'article-updated', 
+      updatedArticle
+    );
+
+    res.status(HTTP_STATUS.OK).json(updatedArticle);
   } catch (err) {
-    // Delete any files that might have been uploaded before error
-    if (req.files && req.files.length > 0) {
+    next(err);
+  }
+});
+
+app.delete('/articles/:id', async (req, res, next) => {
+  try {
+    await articleService.deleteArticle(req.params.id);
+    res.status(HTTP_STATUS.NO_CONTENT).send();
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ARTICLE ATTACHMENTS
+app.post('/articles/:id/attachments', handleFileUpload, async (req, res, next) => {
+  try {
+    const { article, attachments } = await articleService.addAttachments(
+      req.params.id, 
+      req.files
+    );
+    
+    // WebSocket notifications
+    socketService.emitToArticle(
+      req.params.id, 
+      'article-updated', 
+      article
+    );
+    
+    const message = attachments.length === 1 
+      ? `File attached: ${attachments[0].originalName}`
+      : `${attachments.length} files attached`;
+    
+    socketService.sendNotification(req.params.id, message);
+
+    res.status(HTTP_STATUS.OK).json({ attachments });
+  } catch (err) {
+    // Cleanup uploaded files on error
+    if (req.files?.length > 0) {
       req.files.forEach(file => {
         const filePath = path.join(__dirname, 'uploads', file.filename);
         if (fs.existsSync(filePath)) {
@@ -165,117 +185,116 @@ app.post('/articles/:id/attachments', handleFileUpload, async (req, res) => {
         }
       });
     }
-    res.status(400).json({ error: err.message });
+    next(err);
   }
 });
 
-// Remove attachment from article
-app.delete('/articles/:id/attachments/:attachmentId', async (req, res) => {
+app.delete('/articles/:id/attachments/:attachmentId', async (req, res, next) => {
   try {
-    const attachment = await articleService.removeAttachment(req.params.id, req.params.attachmentId);
+    const attachment = await articleService.removeAttachment(
+      req.params.id, 
+      req.params.attachmentId
+    );
 
     // WebSocket notifications
-    socketService.sendNotification(req.params.id, `Attachment removed: ${attachment.originalName}`);
+    socketService.sendNotification(
+      req.params.id, 
+      `Attachment removed: ${attachment.originalName}`
+    );
     
     const article = await articleService.getArticleById(req.params.id);
-    socketService.emitToArticle(req.params.id, 'article-updated', article);
+    socketService.emitToArticle(
+      req.params.id, 
+      'article-updated', 
+      article
+    );
 
-    res.status(204).send();
+    res.status(HTTP_STATUS.NO_CONTENT).send();
   } catch (err) {
-    if (err.message === 'Article not found' || err.message === 'Attachment not found') {
-      res.status(404).json({ error: err.message });
-    } else {
-      res.status(500).json({ error: err.message });
-    }
+    next(err);
   }
 });
 
-// Get comments for article
-app.get('/articles/:id/comments', async (req, res) => {
+// ARTICLE WITH COMMENTS
+app.get('/articles/:id/with-comments', async (req, res, next) => {
+  try {
+    const article = await articleService.getArticleWithComments(req.params.id);
+    res.status(HTTP_STATUS.OK).json(article);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// COMMENT ROUTES
+app.get('/articles/:id/comments', async (req, res, next) => {
   try {
     const comments = await commentService.getCommentsByArticleId(req.params.id);
-    res.json(comments);
+    res.status(HTTP_STATUS.OK).json(comments);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
-// Create new comment
-app.post('/articles/:id/comments', async (req, res) => {
+app.post('/articles/:id/comments', async (req, res, next) => {
   try {
-    const comment = await commentService.createComment(req.params.id, req.body);
-    res.status(201).json(comment);
+    const comment = await commentService.createComment(
+      req.params.id, 
+      req.body
+    );
+    res.status(HTTP_STATUS.CREATED).json(comment);
   } catch (err) {
-    if (err.message === "Article not found") {
-      res.status(404).json({ error: err.message });
-    } else {
-      res.status(400).json({ error: err.message });
-    }
+    next(err);
   }
 });
 
-// Update comment
-app.put('/comments/:id', async (req, res) => {
+app.put('/comments/:id', async (req, res, next) => {
   try {
-    const comment = await commentService.updateComment(req.params.id, req.body);
-    res.json(comment);
+    const comment = await commentService.updateComment(
+      req.params.id, 
+      req.body
+    );
+    res.status(HTTP_STATUS.OK).json(comment);
   } catch (err) {
-    if (err.message === "Comment not found") {
-      res.status(404).json({ error: err.message });
-    } else {
-      res.status(400).json({ error: err.message });
-    }
+    next(err);
   }
 });
 
-// Delete comment
-app.delete('/comments/:id', async (req, res) => {
+app.delete('/comments/:id', async (req, res, next) => {
   try {
     await commentService.deleteComment(req.params.id);
-    res.status(204).send();
+    res.status(HTTP_STATUS.NO_CONTENT).send();
   } catch (err) {
-    if (err.message === "Comment not found") {
-      res.status(404).json({ error: err.message });
-    } else {
-      res.status(500).json({ error: err.message });
-    }
+    next(err);
   }
 });
 
-// Get article with comments
-app.get('/articles/:id/with-comments', async (req, res) => {
+// ERROR HANDLING
+app.use((req, res) => {
+  res.status(HTTP_STATUS.NOT_FOUND).json({
+    success: false,
+    message: `Route ${req.method} ${req.path} not found`,
+    error: ERRORS.ARTICLE_NOT_FOUND
+  });
+});
+
+// Global error handler
+app.use(errorMiddleware);
+
+// DATABASE & SERVER START
+async function startServer() {
   try {
-    const article = await Article.findByPk(req.params.id, {
-      include: [{
-        model: Comment,
-        attributes: ['id', 'content', 'author', 'createdAt', 'updatedAt'],
-        order: [['createdAt', 'ASC']]
-      }]
+    await sequelize.authenticate();
+    databaseLogger.logConnectionSuccess();
+    
+    server.listen(PORT, () => {
+      databaseLogger.logServerStart(PORT, path.join(__dirname, 'uploads'));
     });
-    
-    if (!article) {
-      return res.status(404).json({ error: 'Article not found' });
-    }
-    
-    res.json(article);
   } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch article with comments' });
+    databaseLogger.logConnectionError(err);
   }
-});
+}
 
-// Global error handling middleware
-app.use((error, req, res, next) => {
-  console.error('Global error handler:', error);
-  if (error.code === 'LIMIT_FILE_SIZE') {
-    return res.status(400).json({ error: 'File size too large. Maximum 10MB allowed.' });
-  }
-  if (error.message.includes('Invalid file type')) {
-    return res.status(400).json({ error: error.message });
-  }
-  
-  res.status(500).json({ error: 'Internal server error: ' + error.message });
-});
+// Start the server
+startServer();
 
-server.listen(PORT, () => {
-  console.log(`Server running at http://localhost:${PORT}`);
-});
+module.exports = { app, server, socketService };

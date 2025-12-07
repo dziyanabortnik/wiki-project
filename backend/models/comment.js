@@ -46,9 +46,4 @@ const Comment = sequelize.define('Comment', {
   timestamps: true
 });
 
-// Define associations between Comment and Article
-const Article = require('./article');
-Comment.belongsTo(Article, { foreignKey: 'articleId' });
-Article.hasMany(Comment, { foreignKey: 'articleId', onDelete: 'CASCADE' });
-
 module.exports = Comment;

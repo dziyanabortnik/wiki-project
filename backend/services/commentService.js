@@ -1,3 +1,7 @@
+const { ERRORS } = require('../constants/errorMessages');
+const { validateCommentData } = require('../utils/validators');
+const { handleCommentNotFound } = require('../utils/errorHandlers');
+
 class CommentService {
   constructor(CommentModel, ArticleModel) {
     this.Comment = CommentModel;
@@ -9,86 +13,74 @@ class CommentService {
     try {
       const comments = await this.Comment.findAll({
         where: { articleId },
-        order: [["createdAt", "ASC"]], // Show oldest first
+        order: [["createdAt", "ASC"]],
         attributes: ["id", "content", "author", "createdAt", "updatedAt"],
       });
 
       return comments;
     } catch (err) {
-      throw new Error("Failed to fetch comments");
+      throw new Error(ERRORS.COMMENT_FETCH_FAILED || 'Failed to fetch comments');
     }
   }
 
   async createComment(articleId, commentData) {
-    const { content, author = "Anonymous" } = commentData;
-
-    if (!content || !content.trim()) {
-      throw new Error("Comment content is required");
-    }
+    validateCommentData(commentData);
 
     try {
       // Verify article exists
       const article = await this.Article.findByPk(articleId);
       if (!article) {
-        throw new Error("Article not found");
+        throw new Error(ERRORS.ARTICLE_NOT_FOUND);
       }
 
       const comment = await this.Comment.create({
-        content: content.trim(),
-        author: author.trim() || "Anonymous",
+        content: commentData.content.trim(),
+        author: (commentData.author || 'Anonymous').trim(),
         articleId,
       });
 
       return comment;
     } catch (err) {
-      if (err.message === "Article not found") {
+      if (err.message === ERRORS.ARTICLE_NOT_FOUND) {
         throw err;
       }
-      throw new Error("Failed to create comment");
+      throw new Error(ERRORS.COMMENT_CREATE_FAILED);
     }
   }
 
   async updateComment(commentId, updateData) {
-    const { content, author } = updateData;
-
-    if (!content || !content.trim()) {
-      throw new Error("Comment content is required");
-    }
+    validateCommentData(updateData);
 
     try {
       const comment = await this.Comment.findByPk(commentId);
-      if (!comment) {
-        throw new Error("Comment not found");
-      }
+      handleCommentNotFound(comment, commentId);
 
       const updatedComment = await comment.update({
-        content: content.trim(),
-        author: author ? author.trim() : comment.author,
+        content: updateData.content.trim(),
+        author: updateData.author ? updateData.author.trim() : comment.author,
       });
 
       return updatedComment;
     } catch (err) {
-      if (err.message === "Comment not found") {
+      if (err.message === ERRORS.COMMENT_NOT_FOUND) {
         throw err;
       }
-      throw new Error("Failed to update comment");
+      throw new Error(ERRORS.COMMENT_UPDATE_FAILED);
     }
   }
 
   async deleteComment(commentId) {
     try {
       const comment = await this.Comment.findByPk(commentId);
-      if (!comment) {
-        throw new Error("Comment not found");
-      }
+      handleCommentNotFound(comment, commentId);
 
       await comment.destroy();
       return true;
     } catch (err) {
-      if (err.message === "Comment not found") {
+      if (err.message === ERRORS.COMMENT_NOT_FOUND) {
         throw err;
       }
-      throw new Error("Failed to delete comment");
+      throw new Error(ERRORS.COMMENT_DELETE_FAILED);
     }
   }
 }

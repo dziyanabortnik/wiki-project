@@ -1,7 +1,8 @@
 const path = require("path");
-require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
+require('dotenv').config({ path: path.join(__dirname, '..', '.env.BackUp') });
 
 const { sequelize } = require("../config/database");
+const databaseLogger = require("../utils/databaseLogger");
 
 require("../models/article");
 require("../models/comment");
@@ -10,7 +11,7 @@ require("../models/workspace");
 async function runMigrations() {
   try {
     await sequelize.authenticate();
-    console.log("Database connection established successfully.");
+    databaseLogger.logConnectionSuccess();
 
     // Sync all models with database
     await sequelize.sync({ alter: true });
@@ -34,12 +35,10 @@ async function runMigrations() {
       });
     }
     
-    console.log("Workspaces populated successfully!");
-    console.log("All models synchronized successfully!");
-    console.log("Database setup completed!");
+    databaseLogger.logWorkspacesPopulated();
+    databaseLogger.logMigrationSuccess();
   } catch (error) {
-    console.error("Database setup failed:", error);
-    process.exit(1);
+    databaseLogger.logMigrationError(error);
   }
 }
 

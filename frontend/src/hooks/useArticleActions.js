@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState } from "react";
 
 export function useArticleActions() {
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
 
   const deleteArticle = async (id, title, onSuccess) => {
     if (!window.confirm(`Delete article "${title}"?`)) {
@@ -10,25 +10,26 @@ export function useArticleActions() {
     }
 
     setLoading(true);
-    setError('');
+    setError("");
 
     try {
       const res = await fetch(`http://localhost:3000/articles/${id}`, {
-        method: 'DELETE',
+        method: "DELETE",
       });
 
       if (res.status === 404) {
-        throw new Error('Article not found - it may have been already deleted');
+        throw new Error("Article not found - it may have been already deleted");
       }
 
       if (!res.ok) {
-        throw new Error('Failed to delete article');
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || "Failed to delete article");
       }
 
       onSuccess?.();
     } catch (err) {
       setError(err.message);
-      alert('Error: ' + err.message);
+      alert("Error: " + err.message);
     } finally {
       setLoading(false);
     }
