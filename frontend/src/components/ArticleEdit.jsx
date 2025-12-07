@@ -13,6 +13,7 @@ export default function ArticleEdit() {
   const { id } = useParams();
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
+  const [selectedWorkspace, setSelectedWorkspace] = useState("uncategorized");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [articleExists, setArticleExists] = useState(true);
@@ -40,6 +41,7 @@ export default function ArticleEdit() {
         if (article) {
           setTitle(article.title);
           setContent(article.content);
+          setSelectedWorkspace(article.workspaceId || "uncategorized");
           setAttachments(article.attachments || []);
           setArticleExists(true);
         }
@@ -63,6 +65,7 @@ export default function ArticleEdit() {
       if (updatedArticle.id === id) {
         setTitle(updatedArticle.title || "");
         setContent(updatedArticle.content || "");
+        setSelectedWorkspace(updatedArticle.workspaceId || "uncategorized");
         setAttachments(updatedArticle.attachments || []);
       }
     };
@@ -94,7 +97,11 @@ export default function ArticleEdit() {
       const res = await fetch(`http://localhost:3000/articles/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, content }),
+        body: JSON.stringify({ 
+          title, 
+          content,
+          workspaceId: selectedWorkspace 
+        }),
       });
 
       if (res.status === 404) {
@@ -200,6 +207,23 @@ export default function ArticleEdit() {
         />
 
         <QuillEditor value={content} onChange={setContent} />
+
+        <div className="workspace-selector">
+          <label>Workspace: </label>
+
+          <select
+            value={selectedWorkspace}
+            onChange={(e) => setSelectedWorkspace(e.target.value)}
+            required
+            disabled={!articleExists || loading}
+          >
+            <option value="uncategorized">Uncategorized</option>
+            <option value="nature">Nature & Science</option>
+            <option value="culture">Culture & Arts</option>
+            <option value="tech">Technology</option>
+            <option value="education">Education</option>
+          </select>
+        </div>
 
         <AttachmentManager
           articleId={id}

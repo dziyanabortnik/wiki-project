@@ -1,19 +1,12 @@
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/database');
 
-// Article model - represents wiki articles
-const Article = sequelize.define('Article', {
+// Comment model - user comments on articles
+const Comment = sequelize.define('Comment', {
   id: {
     type: DataTypes.UUID,
     defaultValue: DataTypes.UUIDV4,
     primaryKey: true
-  },
-  title: {
-    type: DataTypes.STRING,
-    allowNull: false,
-    validate: {
-      notEmpty: true
-    }
   },
   content: {
     type: DataTypes.TEXT,
@@ -22,13 +15,21 @@ const Article = sequelize.define('Article', {
       notEmpty: true
     }
   },
-  workspaceId: {
+  author: {
     type: DataTypes.STRING,
-    allowNull: true
+    allowNull: false,
+    defaultValue: 'Anonymous',
+    validate: {
+      notEmpty: true
+    }
   },
-  attachments: {
-    type: DataTypes.JSONB,
-    defaultValue: []
+  articleId: {
+    type: DataTypes.UUID,
+    allowNull: false,
+    references: {
+      model: 'articles',
+      key: 'id'
+    }
   },
   createdAt: {
     type: DataTypes.DATE,
@@ -41,8 +42,8 @@ const Article = sequelize.define('Article', {
     defaultValue: DataTypes.NOW
   }
 }, {
-  tableName: 'articles',
+  tableName: 'comments',
   timestamps: true
 });
 
-module.exports = Article;
+module.exports = Comment;

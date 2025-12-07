@@ -1,37 +1,53 @@
-const fs = require('fs');
-const path = require('path');
-const { Op } = require('sequelize');
-const { validateArticleData, validateAttachmentFiles } = require('../utils/validators');
-const { handleArticleNotFound, handleAttachmentNotFound } = require('../utils/errorHandlers');
-const { deleteAttachmentFiles, createAttachmentObjects } = require('../utils/fileHelpers');
+const { ERRORS } = require("../constants/errorMessages");
+const {
+  handleArticleNotFound,
+  handleAttachmentNotFound,
+} = require("../utils/errorHandlers");
+const {
+  validateArticleData,
+  validateAttachmentFiles,
+} = require("../utils/validators");
+const {
+  deleteAttachmentFiles,
+  createAttachmentObjects,
+} = require("../utils/fileHelpers");
+const fs = require("fs");
+const path = require("path");
 
 class ArticleService {
   constructor(ArticleModel, uploadDir) {
     this.Article = ArticleModel;
-    this.UPLOAD_DIR = uploadDir;
-    this.ensureDirectories();
+    this.uploadDir = uploadDir;
+    this.ensureUploadDirectory();
   }
 
-  ensureDirectories() {
-    if (!fs.existsSync(this.UPLOAD_DIR)) {
-      fs.mkdirSync(this.UPLOAD_DIR, { recursive: true });
+  ensureUploadDirectory() {
+    if (!fs.existsSync(this.uploadDir)) {
+      fs.mkdirSync(this.uploadDir, { recursive: true });
     }
   }
 
-  async getAllArticles() {
+  // Get all articles, optionally filtered by workspace
+  async getAllArticles(workspaceId = null) {
     try {
+      const whereClause = workspaceId ? { workspaceId } : {};
+
       const articles = await this.Article.findAll({
-        attributes: ['id', 'title', 'updatedAt'],
-        order: [['updatedAt', 'DESC']]
+        where: whereClause,
+        attributes: ["id", "title", "updatedAt", "workspaceId", "attachments"],
+        order: [["updatedAt", "DESC"]],
       });
 
-      return articles.map(article => ({
+      return articles.map((article) => ({
         id: article.id,
         title: article.title,
-        attachments: article.attachments || []
+        attachments: article.attachments || [],
+        workspaceId: article.workspaceId,
+        updatedAt: article.updatedAt,
       }));
     } catch (err) {
-      throw new Error("Failed to read articles");
+      console.error("Error fetching articles:", err);
+      throw new Error(ERRORS.ARTICLE_FETCH_FAILED);
     }
   }
 
@@ -41,10 +57,10 @@ class ArticleService {
       handleArticleNotFound(article, id);
       return article;
     } catch (err) {
-      if (err.message === "Article not found") {
+      if (err.message === ERRORS.ARTICLE_NOT_FOUND) {
         throw err;
       }
-      throw new Error("Failed to read article");
+      throw new Error(ERRORS.ARTICLE_FETCH_FAILED);
     }
   }
 
@@ -52,14 +68,21 @@ class ArticleService {
     validateArticleData(articleData);
 
     try {
+      console.log(
+        "Creating article with workspaceId:",
+        articleData.workspaceId
+      );
+
       const article = await this.Article.create({
-        title: articleData.title,
+        title: articleData.title.trim(),
         content: articleData.content,
-        attachments: []
+        workspaceId: articleData.workspaceId || null,
+        attachments: [],
       });
       return article;
     } catch (err) {
-      throw new Error("Failed to save article");
+      console.error("Database error:", err);
+      throw new Error(ERRORS.ARTICLE_CREATE_FAILED);
     }
   }
 
@@ -71,16 +94,17 @@ class ArticleService {
       handleArticleNotFound(article, id);
 
       const updatedArticle = await article.update({
-        title: updateData.title,
-        content: updateData.content
+        title: updateData.title.trim(),
+        content: updateData.content,
+        workspaceId: updateData.workspaceId || article.workspaceId,
       });
 
       return updatedArticle;
     } catch (err) {
-      if (err.message === "Article not found") {
+      if (err.message === ERRORS.ARTICLE_NOT_FOUND) {
         throw err;
       }
-      throw new Error("Failed to update article");
+      throw new Error(ERRORS.ARTICLE_UPDATE_FAILED);
     }
   }
 
@@ -89,15 +113,20 @@ class ArticleService {
       const article = await this.Article.findByPk(id);
       handleArticleNotFound(article, id);
 
-      deleteAttachmentFiles(article.attachments, this.UPLOAD_DIR);
+      const Comment = require("../models/comment");
+      await Comment.destroy({
+        where: { articleId: id },
+      });
+
+      deleteAttachmentFiles(article.attachments, this.uploadDir);
       await article.destroy();
-      
+
       return true;
     } catch (err) {
-      if (err.message === "Article not found") {
+      if (err.message === ERRORS.ARTICLE_NOT_FOUND) {
         throw err;
       }
-      throw new Error("Failed to delete article");
+      throw new Error(ERRORS.ARTICLE_DELETE_FAILED);
     }
   }
 
@@ -113,15 +142,15 @@ class ArticleService {
       const updatedAttachments = [...currentAttachments, ...newAttachments];
 
       await article.update({
-        attachments: updatedAttachments
+        attachments: updatedAttachments,
       });
 
       return { article, attachments: newAttachments };
     } catch (err) {
-      if (err.message === "Article not found") {
+      if (err.message === ERRORS.ARTICLE_NOT_FOUND) {
         throw err;
       }
-      throw new Error("Failed to add attachments: " + err.message);
+      throw new Error(ERRORS.ATTACHMENT_UPLOAD_FAILED);
     }
   }
 
@@ -130,11 +159,13 @@ class ArticleService {
       const article = await this.Article.findByPk(articleId);
       handleArticleNotFound(article, articleId);
 
-      const attachment = (article.attachments || []).find((a) => a.id == attachmentId);
+      const attachment = (article.attachments || []).find(
+        (a) => a.id == attachmentId
+      );
       handleAttachmentNotFound(attachment, attachmentId);
 
       // Delete physical file
-      const diskFile = path.join(this.UPLOAD_DIR, attachment.filename);
+      const diskFile = path.join(this.uploadDir, attachment.filename);
       if (fs.existsSync(diskFile)) {
         fs.unlinkSync(diskFile);
       }
@@ -145,15 +176,43 @@ class ArticleService {
       );
 
       await article.update({
-        attachments: updatedAttachments
+        attachments: updatedAttachments,
       });
 
       return attachment;
     } catch (err) {
-      if (err.message === "Article not found" || err.message === "Attachment not found") {
+      if (
+        err.message === ERRORS.ARTICLE_NOT_FOUND ||
+        err.message === ERRORS.ATTACHMENT_NOT_FOUND
+      ) {
         throw err;
       }
-      throw new Error("Failed to remove attachment");
+      throw new Error(ERRORS.ATTACHMENT_REMOVE_FAILED);
+    }
+  }
+
+  async getArticleWithComments(articleId) {
+    try {
+      const article = await this.Article.findByPk(articleId, {
+        include: [
+          {
+            model: require("../models/comment"),
+            as: "comments",
+            attributes: ["id", "content", "author", "createdAt", "updatedAt"],
+            order: [["createdAt", "ASC"]],
+          },
+        ],
+      });
+
+      if (!article) {
+        throw new Error(ERRORS.ARTICLE_NOT_FOUND);
+      }
+      return article;
+    } catch (err) {
+      if (err.message === ERRORS.ARTICLE_NOT_FOUND) {
+        throw err;
+      }
+      throw new Error("Failed to fetch article with comments");
     }
   }
 }

@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { ERRORS } = require('../constants/errorMessages');
 
 const deleteAttachmentFiles = (attachments, uploadDir) => {
   if (attachments && attachments.length > 0) {
@@ -24,7 +25,15 @@ const createAttachmentObjects = (files) => {
   }));
 };
 
+const validateFileSize = (file, maxSize) => {
+  if (file.size > maxSize) {
+    throw new Error(ERRORS.FILE_TOO_LARGE);
+  }
+  return true;
+};
+
 module.exports = {
   deleteAttachmentFiles,
-  createAttachmentObjects
+  createAttachmentObjects,
+  validateFileSize
 };
