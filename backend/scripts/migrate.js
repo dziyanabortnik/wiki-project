@@ -7,6 +7,7 @@ const databaseLogger = require("../utils/databaseLogger");
 require("../models/article");
 require("../models/comment");
 require("../models/workspace");
+require("../models/articleVersion");
 
 async function runMigrations() {
   try {

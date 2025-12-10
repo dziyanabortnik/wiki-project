@@ -5,6 +5,8 @@ export function useArticleActions() {
   const [error, setError] = useState("");
 
   const deleteArticle = async (id, title, onSuccess) => {
+    console.log("Deleting article:", id, title);
+    
     if (!window.confirm(`Delete article "${title}"?`)) {
       return;
     }
@@ -17,6 +19,8 @@ export function useArticleActions() {
         method: "DELETE",
       });
 
+      console.log("Delete response status:", res.status);
+
       if (res.status === 404) {
         throw new Error("Article not found - it may have been already deleted");
       }
@@ -26,8 +30,10 @@ export function useArticleActions() {
         throw new Error(errorData.error || "Failed to delete article");
       }
 
+      console.log("Article deleted successfully");
       onSuccess?.();
     } catch (err) {
+      console.error("Delete error:", err);
       setError(err.message);
       alert("Error: " + err.message);
     } finally {

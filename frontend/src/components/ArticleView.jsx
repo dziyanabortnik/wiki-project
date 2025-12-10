@@ -1,98 +1,134 @@
-import { useEffect, useState } from 'react';
-import { useParams, Link, useNavigate  } from 'react-router-dom';
-import { useArticleActions } from '../hooks/useArticleActions';
-import socket from '../services/socket';
-import { getWorkspaceName } from '../constants/workspaces';
-import CommentsSection from './CommentsSection';
+import { useEffect, useState } from "react";
+import {
+  useParams,
+  Link,
+  useNavigate,
+  useSearchParams,
+} from "react-router-dom";
+import { useArticleActions } from "../hooks/useArticleActions";
+import socket from "../services/socket";
+import { getWorkspaceName } from "../constants/workspaces";
+import CommentsSection from "./CommentsSection";
 
 export default function ArticleView() {
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
+  const versionNumber = searchParams.get("version");
   const [article, setArticle] = useState(null);
-  const [attachments, setAttachments] = useState([]);
-  const { deleteArticle } = useArticleActions();
+  const [isHistorical, setIsHistorical] = useState(false);
+  const [versionsCount, setVersionsCount] = useState(0);
+  const { deleteArticle, loading, error } = useArticleActions();
   const navigate = useNavigate();
 
-  // Fetch article data when component mounts or ID changes
+  //Fetch article data
   useEffect(() => {
-    fetch(`http://localhost:3000/articles/${id}`)
-      .then(res => res.json())
-      .then(setArticle)
+    let url = `http://localhost:3000/articles/${id}`;
+    if (versionNumber) {
+      url = `http://localhost:3000/articles/${id}/versions/${versionNumber}`;
+      setIsHistorical(true);
+    }
+
+    fetch(url)
+      .then((res) => res.json())
+      .then((data) => {
+        setArticle(data);
+        if (data.isHistorical) setIsHistorical(true);
+      })
       .catch(console.error);
-  }, [id]);
 
-  // Real-time updates via WebSocket
+    // Load versions count only
+    fetch(`http://localhost:3000/articles/${id}/versions`)
+      .then((res) => res.json())
+      .then((versions) => setVersionsCount(versions.length))
+      .catch(console.error);
+  }, [id, versionNumber]);
+
+  // Real-time updates
   useEffect(() => {
-    if (!id) return;
+    if (!id || isHistorical) return;
 
-    socket.emit('join-article', id);
-
+    socket.emit("join-article", id);
     const handler = (updatedArticle) => {
-      if (updatedArticle.id === id) {
-        setArticle(updatedArticle);
-        setAttachments(updatedArticle.attachments || []);
-      }
+      if (updatedArticle.id === id) setArticle(updatedArticle);
     };
-
-    socket.on('article-updated', handler);
-
-    return () => {
-      socket.off('article-updated', handler);
-    };
-  }, [id]); 
+    socket.on("article-updated", handler);
+    return () => socket.off("article-updated", handler);
+  }, [id, isHistorical]);
 
   const handleDelete = async () => {
-    await deleteArticle(article.id, article.title, () => {
-      navigate('/');
-    });
+    await deleteArticle(id, article?.title || "Article", () => navigate("/"));
   };
 
-  // Open attachment in new window/tab
   const handleViewAttachment = (attachment) => {
-    if (!attachment || !attachment.path) {
-      console.error('Invalid attachment:', attachment);
-      alert('Cannot open attachment: invalid file data');
+    if (!attachment?.path) {
+      alert("Cannot open attachment");
       return;
     }
-    
-    const url = `http://localhost:3000${attachment.path.startsWith('/') ? '' : '/'}${attachment.path}`;
-    console.log('Opening attachment URL:', url);
-    
-    try {
-      new URL(url);
-      if (attachment.mimetype.startsWith('image/') || attachment.mimetype === 'application/pdf') {
-        window.open(url, '_blank', 'width=800,height=600');
-      } else {
-        window.open(url, '_blank');
-      }
-    } catch (urlError) {
-      console.error('Invalid URL:', url, urlError);
-      alert('Cannot open attachment: invalid URL format');
+
+    let url = attachment.path;
+    if (!url.startsWith('http')) {
+      url = `http://localhost:3000${url.startsWith("/") ? "" : "/"}${url}`;
     }
+    window.open(url, "_blank");
   };
 
   if (!article) return <div>Loading...</div>;
 
+  const displayAttachments = article.attachments || [];
+
   return (
-    <div className='view'>
+    <div className="view">
+      {isHistorical && (
+        <div className="historical-warning">
+          <strong>You are viewing version {versionNumber}</strong>
+          <br />
+          <small>Created: {new Date(article.createdAt).toLocaleString()}</small>
+          <br />
+          <div className="historical-actions">
+            <Link to={`/article/${id}/versions`} className="history-link">
+              Back to version history
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {error && (
+        <div className="error-message">
+          {error}
+        </div>
+      )}
+
       <div className="article-header">
         <h2>{article.title}</h2>
-        <div className="article-workspace">
+        <div className="article-meta">
           <span className="workspace-badge">
             {getWorkspaceName(article.workspaceId)}
           </span>
+          {!isHistorical && versionsCount > 1 && (
+            <span className="versions-count">
+              <Link to={`/article/${id}/versions`}>
+                {versionsCount - 1} change{versionsCount - 1 !== 1 ? "s" : ""}
+              </Link>
+            </span>
+          )}
         </div>
       </div>
-      
-      <div dangerouslySetInnerHTML={{ __html: article.content }} className='view-article'/>
-      
-      {article.attachments && article.attachments.length > 0 && (
+
+      <div
+        dangerouslySetInnerHTML={{ __html: article.content }}
+        className="view-article"
+      />
+
+      {displayAttachments.length > 0 && (
         <div className="article-attachments">
-          <h3>Attachments ({article.attachments.length})</h3>
-          
+          <h3>Attachments ({displayAttachments.length})</h3>
           <div className="attachments-list">
-            {article.attachments.map(attachment => (
-              <div key={attachment.id}>
-                <span className='attachment-name' onClick={() => handleViewAttachment(attachment)}>
+            {displayAttachments.map((attachment) => (
+              <div key={attachment.id || attachment.filename}>
+                <span
+                  className="attachment-name"
+                  onClick={() => handleViewAttachment(attachment)}
+                >
                   {attachment.originalName}
                 </span>
               </div>
@@ -101,12 +137,26 @@ export default function ArticleView() {
         </div>
       )}
 
-      <CommentsSection articleId={id} />
+      {!isHistorical && <CommentsSection articleId={id} />}
 
       <div className="article-actions">
-        <Link to={`/edit/${article.id}`} className="edit-link">Edit Article</Link>
-        <button onClick={handleDelete} className="delete-btn">Delete Article</button>
-        <Link to="/" className="back-link">Back to list</Link>
+        {!isHistorical && (
+          <Link to={`/edit/${article.id}`} className="edit-link">
+            Edit Article
+          </Link>
+        )}
+        {!isHistorical && (
+          <button 
+            onClick={handleDelete} 
+            className="delete-btn"
+            disabled={loading}
+          >
+            {loading ? 'Deleting...' : 'Delete Article'}
+          </button>
+        )}
+        <Link to="/" className="back-link">
+          Back to list
+        </Link>
       </div>
     </div>
   );
