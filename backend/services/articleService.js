@@ -14,9 +14,11 @@ const {
 const fs = require("fs");
 const path = require("path");
 
+// Main service for article operations including versioning
 class ArticleService {
-  constructor(ArticleModel, uploadDir) {
+  constructor(ArticleModel, ArticleVersionModel, uploadDir) {
     this.Article = ArticleModel;
+    this.ArticleVersion = ArticleVersionModel;
     this.uploadDir = uploadDir;
     this.ensureUploadDirectory();
   }
@@ -78,7 +80,23 @@ class ArticleService {
         content: articleData.content,
         workspaceId: articleData.workspaceId || null,
         attachments: [],
+        currentVersion: 1,
       });
+
+      const version = await this.ArticleVersion.create({
+        articleId: article.id,
+        version: 1,
+        title: articleData.title.trim(),
+        content: articleData.content,
+        workspaceId: articleData.workspaceId || null,
+        attachments: [],
+        createdBy: "author",
+      });
+
+      await article.update({
+        latestVersionId: version.id,
+      });
+
       return article;
     } catch (err) {
       console.error("Database error:", err);
@@ -93,25 +111,115 @@ class ArticleService {
       const article = await this.Article.findByPk(id);
       handleArticleNotFound(article, id);
 
-      const updatedArticle = await article.update({
+      const result = await this.createArticleVersion(id, {
         title: updateData.title.trim(),
         content: updateData.content,
         workspaceId: updateData.workspaceId || article.workspaceId,
+        attachments: article.attachments || [],
+        createdBy: "user",
       });
 
-      return updatedArticle;
+      return {
+        ...result.article.toJSON(),
+        version: result.version.version,
+      };
     } catch (err) {
-      if (err.message === ERRORS.ARTICLE_NOT_FOUND) {
+      if (err.message === "Article not found") {
         throw err;
       }
+      console.error("Update article error:", err);
       throw new Error(ERRORS.ARTICLE_UPDATE_FAILED);
     }
   }
 
+  // Create new version of article
+  async createArticleVersion(articleId, versionData) {
+    try {
+      const article = await this.Article.findByPk(articleId);
+      if (!article) {
+        throw new Error("Article not found");
+      }
+
+      const newVersionNumber = (article.currentVersion || 0) + 1;
+
+      const newVersion = await this.ArticleVersion.create({
+        articleId,
+        version: newVersionNumber,
+        title: versionData.title.trim(),
+        content: versionData.content,
+        workspaceId: versionData.workspaceId || article.workspaceId,
+        attachments: versionData.attachments || article.attachments || [],
+        createdBy: versionData.createdBy || "system",
+      });
+
+      await article.update({
+        title: versionData.title.trim(),
+        content: versionData.content,
+        workspaceId: versionData.workspaceId || article.workspaceId,
+        attachments: versionData.attachments || article.attachments || [],
+        currentVersion: newVersionNumber,
+        latestVersionId: newVersion.id,
+      });
+
+      return {
+        article: await this.Article.findByPk(articleId),
+        version: newVersion,
+      };
+    } catch (error) {
+      console.error("Error creating article version:", error);
+      throw new Error("Failed to create article version");
+    }
+  }
+
+  // Get all versions of an article
+  async getArticleVersions(articleId) {
+    try {
+      const versions = await this.ArticleVersion.findAll({
+        where: { articleId },
+        order: [["version", "DESC"]],
+        attributes: ["id", "version", "title", "createdBy", "createdAt"],
+      });
+
+      return versions;
+    } catch (error) {
+      console.error("Error fetching article versions:", error);
+      throw new Error("Failed to fetch article versions");
+    }
+  }
+
+  // Get specific version of article
+  async getArticleVersion(articleId, versionNumber) {
+    try {
+      const version = await this.ArticleVersion.findOne({
+        where: {
+          articleId,
+          version: versionNumber,
+        },
+      });
+
+      if (!version) {
+        throw new Error("Article version not found");
+      }
+
+      return version;
+    } catch (error) {
+      if (error.message === "Article version not found") {
+        throw error;
+      }
+      console.error("Error fetching article version:", error);
+      throw new Error("Failed to fetch article version");
+    }
+  }
+
+  // Delete article and all its versions
   async deleteArticle(id) {
     try {
       const article = await this.Article.findByPk(id);
       handleArticleNotFound(article, id);
+
+      await this.ArticleVersion.destroy({
+        where: { articleId: id },
+      });
 
       const Comment = require("../models/comment");
       await Comment.destroy({
