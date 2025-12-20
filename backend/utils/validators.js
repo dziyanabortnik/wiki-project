@@ -48,9 +48,48 @@ const validateWorkspaceData = (workspaceData) => {
   return true;
 };
 
+const validateRegistrationData = (userData) => {
+  const { email, password, name } = userData;
+  
+  if (!email || !email.trim()) {
+    throw new Error('Email is required');
+  }
+  
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    throw new Error(ERRORS.INVALID_EMAIL);
+  }
+  
+  if (!password || password.length < 6) {
+    throw new Error(ERRORS.PASSWORD_TOO_SHORT);
+  }
+  
+  if (!name || !name.trim()) {
+    throw new Error('Name is required');
+  }
+  
+  return true;
+};
+
+const validateLoginData = (credentials) => {
+  const { email, password } = credentials;
+  
+  if (!email || !email.trim()) {
+    throw new Error('Email is required');
+  }
+  
+  if (!password) {
+    throw new Error('Password is required');
+  }
+  
+  return true;
+};
+
 module.exports = {
   validateArticleData,
   validateAttachmentFiles,
   validateCommentData,
-  validateWorkspaceData
+  validateWorkspaceData,
+  validateRegistrationData,
+  validateLoginData
 };

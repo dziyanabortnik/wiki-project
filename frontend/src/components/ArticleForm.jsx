@@ -5,6 +5,7 @@ import "react-quill/dist/quill.snow.css";
 import "../App.css";
 import AttachmentManager from "./AttachmentManager";
 import { workspaceNames } from '../constants/workspaces';
+import { useAuth } from '../hooks/useAuth';
 
 const QuillEditor = forwardRef(({ value, onChange }, ref) => (
   <ReactQuill ref={ref} value={value} onChange={onChange} />
@@ -19,6 +20,7 @@ export default function ArticleForm() {
   const [attachments, setAttachments] = useState([]);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { getAuthHeader } = useAuth();
 
   // Auto-select workspace from URL parameter
   useEffect(() => {
@@ -63,15 +65,22 @@ export default function ArticleForm() {
     setLoading(true);
 
     try {
-      const articleRes = await fetch('http://localhost:3000/articles', {
+      const articleRes = await fetch('/api/articles', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...getAuthHeader()
+        },
         body: JSON.stringify({
           title,
           content,
           workspaceId: selectedWorkspace || null,
         }),
       });
+
+      if (articleRes.status === 401) {
+        throw new Error('Session expired. Please login again.');
+      }
 
       if (!articleRes.ok) {
         const errorText = await articleRes.text();
@@ -80,33 +89,34 @@ export default function ArticleForm() {
       }
 
       const articleData = await articleRes.json();
-      const articleId = articleData.id;
+      const articleId = articleData.article.id;
       console.log('Article created with ID:', articleId);
 
        // Upload attachments if any
       if (attachments.length > 0) {
         console.log(`Uploading ${attachments.length} attachments...`);
         
-        for (const attachment of attachments) {
-          try {
-            const formData = new FormData();
-            formData.append('files', attachment.file);
+        const formData = new FormData();
+        attachments.forEach(attachment => {
+          formData.append('files', attachment.file);
+        });
 
-            console.log(`Uploading attachment: ${attachment.originalName}`);
-            const attachmentRes = await fetch(`http://localhost:3000/articles/${articleId}/attachments`, {
-              method: 'POST',
-              body: formData,
-            });
+        try {
+          console.log('Uploading attachments...');
+          const attachmentRes = await fetch(`/api/articles/${articleId}/attachments`, {
+            method: 'POST',
+            headers: getAuthHeader(),
+            body: formData,
+          });
 
-            if (!attachmentRes.ok) {
-              const errorText = await attachmentRes.text();
-              console.warn(`Failed to upload attachment ${attachment.originalName}:`, errorText);
-            } else {
-              console.log(`Attachment uploaded: ${attachment.originalName}`);
-            }
-          } catch (attachmentErr) {
-            console.error(`Error uploading attachment ${attachment.originalName}:`, attachmentErr);
+          if (!attachmentRes.ok) {
+            const errorText = await attachmentRes.text();
+            console.warn('Failed to upload attachments:', errorText);
+          } else {
+            console.log('Attachments uploaded successfully');
           }
+        } catch (attachmentErr) {
+          console.error('Error uploading attachments:', attachmentErr);
         }
       }
 

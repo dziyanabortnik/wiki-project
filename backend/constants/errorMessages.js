@@ -1,5 +1,16 @@
 module.exports = {
   ERRORS: {
+    // Authentication
+    USER_ALREADY_EXISTS: 'User already exists',
+    USER_NOT_FOUND: 'User not found',
+    INVALID_CREDENTIALS: 'Invalid email or password',
+    UNAUTHORIZED: 'Unauthorized access',
+    TOKEN_EXPIRED: 'Token expired',
+    TOKEN_INVALID: 'Invalid token',
+    TOKEN_REQUIRED: 'Token required',
+    PASSWORD_TOO_SHORT: 'Password must be at least 6 characters',
+    INVALID_EMAIL: 'Invalid email format',
+    
     // Articles
     ARTICLE_NOT_FOUND: 'Article not found',
     ARTICLE_CREATE_FAILED: 'Failed to create article',

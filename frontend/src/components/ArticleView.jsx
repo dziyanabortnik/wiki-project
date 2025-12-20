@@ -9,6 +9,7 @@ import { useArticleActions } from "../hooks/useArticleActions";
 import socket from "../services/socket";
 import { getWorkspaceName } from "../constants/workspaces";
 import CommentsSection from "./CommentsSection";
+import { useAuth } from '../hooks/useAuth';
 
 export default function ArticleView() {
   const { id } = useParams();
@@ -19,17 +20,25 @@ export default function ArticleView() {
   const [versionsCount, setVersionsCount] = useState(0);
   const { deleteArticle, loading, error } = useArticleActions();
   const navigate = useNavigate();
+  const { getAuthHeader, user } = useAuth();
 
   //Fetch article data
   useEffect(() => {
-    let url = `http://localhost:3000/articles/${id}`;
+    let url = `/api/articles/${id}`;
     if (versionNumber) {
-      url = `http://localhost:3000/articles/${id}/versions/${versionNumber}`;
+      url = `/api/articles/${id}/versions/${versionNumber}`;
       setIsHistorical(true);
     }
 
-    fetch(url)
-      .then((res) => res.json())
+    fetch(url, {
+      headers: getAuthHeader()
+    })
+      .then((res) => {
+        if (res.status === 401) {
+          throw new Error('Session expired. Please login again.');
+        }
+        return res.json();
+      })
       .then((data) => {
         setArticle(data);
         if (data.isHistorical) setIsHistorical(true);
@@ -37,8 +46,15 @@ export default function ArticleView() {
       .catch(console.error);
 
     // Load versions count only
-    fetch(`http://localhost:3000/articles/${id}/versions`)
-      .then((res) => res.json())
+    fetch(`/api/articles/${id}/versions`, {
+      headers: getAuthHeader()
+    })
+      .then((res) => {
+        if (res.status === 401) {
+          throw new Error('Session expired. Please login again.');
+        }
+        return res.json();
+      })
       .then((versions) => setVersionsCount(versions.length))
       .catch(console.error);
   }, [id, versionNumber]);
@@ -83,6 +99,9 @@ export default function ArticleView() {
           <strong>You are viewing version {versionNumber}</strong>
           <br />
           <small>Created: {new Date(article.createdAt).toLocaleString()}</small>
+          {article.user && (
+            <small> by {article.user.name}</small>
+          )}
           <br />
           <div className="historical-actions">
             <Link to={`/article/${id}/versions`} className="history-link">
@@ -104,6 +123,16 @@ export default function ArticleView() {
           <span className="workspace-badge">
             {getWorkspaceName(article.workspaceId)}
           </span>
+          
+          {article.user && (
+            <div className="article-author">
+              <div className="author-avatar">
+                {article.user.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)}
+              </div>
+              <span>Created by {article.user.name}</span>
+            </div>
+          )}
+          
           {!isHistorical && versionsCount > 1 && (
             <span className="versions-count">
               <Link to={`/article/${id}/versions`}>

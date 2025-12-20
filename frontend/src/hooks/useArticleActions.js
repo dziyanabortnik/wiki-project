@@ -1,12 +1,13 @@
 import { useState } from "react";
+import { useAuth } from "../hooks/useAuth";
 
 export function useArticleActions() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-
+  const { getAuthHeader, logout } = useAuth();
   const deleteArticle = async (id, title, onSuccess) => {
     console.log("Deleting article:", id, title);
-    
+
     if (!window.confirm(`Delete article "${title}"?`)) {
       return;
     }
@@ -15,11 +16,17 @@ export function useArticleActions() {
     setError("");
 
     try {
-      const res = await fetch(`http://localhost:3000/articles/${id}`, {
+      const res = await fetch(`/api/articles/${id}`, {
         method: "DELETE",
+        headers: getAuthHeader(),
       });
 
       console.log("Delete response status:", res.status);
+
+      if (res.status === 401) {
+        logout();
+        throw new Error("Session expired. Please login again.");
+      }
 
       if (res.status === 404) {
         throw new Error("Article not found - it may have been already deleted");
