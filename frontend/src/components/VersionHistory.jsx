@@ -1,24 +1,39 @@
 import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
+import { useAuth } from "../hooks/useAuth";
 
 export default function VersionHistoryPage() {
   const { id } = useParams();
   const [article, setArticle] = useState(null);
   const [versions, setVersions] = useState([]);
   const [loading, setLoading] = useState(true);
+  const { getAuthHeader } = useAuth();
 
   useEffect(() => {
-    // Load article info
-    fetch(`http://localhost:3000/articles/${id}`)
-      .then((res) => res.json())
-      .then(setArticle)
-      .catch(console.error);
-
-    // Load version history
-    fetch(`http://localhost:3000/articles/${id}/versions`)
-      .then((res) => res.json())
+    fetch(`/api/articles/${id}`, {
+      headers: getAuthHeader(),
+    })
+      .then((res) => {
+        if (res.status === 401) {
+          throw new Error("Session expired. Please login again.");
+        }
+        return res.json();
+      })
       .then((data) => {
-        setVersions(data);
+        setArticle(data);
+        return fetch(`/api/articles/${id}/versions`, {
+          headers: getAuthHeader(),
+        });
+      })
+      .then((res) => {
+        if (res.status === 401) {
+          throw new Error("Session expired. Please login again.");
+        }
+        return res.json();
+      })
+      .then((data) => {
+        console.log("Versions data:", data);
+        setVersions(Array.isArray(data) ? data : []);
         setLoading(false);
       })
       .catch((err) => {
@@ -51,6 +66,9 @@ export default function VersionHistoryPage() {
           <h3>Current: Version {article.currentVersion}</h3>
           <p>
             Last modified: {new Date(article.updatedAt).toLocaleString()}
+            {article.user && (
+              <span className="changes-count"> by {article.user.name}</span>
+            )}
             {article.currentVersion > 1 && (
               <span className="changes-count">
                 {article.currentVersion - 1} change
@@ -70,8 +88,8 @@ export default function VersionHistoryPage() {
               <div className="table-header">
                 <div className="col-version">Version</div>
                 <div className="col-date">Created</div>
+                <div className="col-author">Changed By</div>
                 <div className="col-title">Title</div>
-                <div className="col-actions">View</div>
               </div>
 
               {oldVersions
@@ -86,6 +104,19 @@ export default function VersionHistoryPage() {
                     </div>
                     <div className="col-date">
                       {new Date(version.createdAt).toLocaleString()}
+                    </div>
+                    <div className="col-author">
+                      <div className="author-info">
+                        <div className="author-avatar-small">
+                          {version.user.name
+                            .split(" ")
+                            .map((w) => w[0])
+                            .join("")
+                            .toUpperCase()
+                            .slice(0, 2)}
+                        </div>
+                        <span>{version.user.name}</span>
+                      </div>
                     </div>
                     <div className="col-title">{version.title}</div>
                     <div className="col-actions">

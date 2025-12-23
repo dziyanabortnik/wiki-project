@@ -18,7 +18,7 @@ const Comment = sequelize.define('Comment', {
   author: {
     type: DataTypes.STRING,
     allowNull: false,
-    defaultValue: 'Anonymous',
+    defaultValue: 'User',
     validate: {
       notEmpty: true
     }
@@ -28,6 +28,14 @@ const Comment = sequelize.define('Comment', {
     allowNull: false,
     references: {
       model: 'articles',
+      key: 'id'
+    }
+  },
+  userId: {
+    type: DataTypes.UUID,
+    allowNull: true,
+    references: {
+      model: 'users',
       key: 'id'
     }
   },

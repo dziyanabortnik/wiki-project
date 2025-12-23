@@ -16,7 +16,8 @@ const errorMiddleware = (err, req, res, next) => {
     ERRORS.ARTICLE_NOT_FOUND,
     ERRORS.ATTACHMENT_NOT_FOUND,
     ERRORS.COMMENT_NOT_FOUND,
-    ERRORS.WORKSPACE_NOT_FOUND
+    ERRORS.WORKSPACE_NOT_FOUND,
+    ERRORS.USER_NOT_FOUND
   ];
   
   if (notFoundErrors.includes(err.message)) {
@@ -31,7 +32,15 @@ const errorMiddleware = (err, req, res, next) => {
     ERRORS.WORKSPACE_NAME_REQUIRED,
     ERRORS.INVALID_FILE_TYPE,
     ERRORS.FILE_TOO_LARGE,
-    ERRORS.NO_FILES_UPLOADED
+    ERRORS.NO_FILES_UPLOADED,
+    ERRORS.USER_ALREADY_EXISTS,
+    ERRORS.INVALID_CREDENTIALS,
+    ERRORS.PASSWORD_TOO_SHORT,
+    ERRORS.INVALID_EMAIL,
+    ERRORS.UNAUTHORIZED,
+    ERRORS.TOKEN_EXPIRED,
+    ERRORS.TOKEN_INVALID,
+    ERRORS.TOKEN_REQUIRED
   ];
   
   if (validationErrors.includes(err.message)) {

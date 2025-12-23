@@ -36,7 +36,21 @@ class ArticleService {
 
       const articles = await this.Article.findAll({
         where: whereClause,
-        attributes: ["id", "title", "updatedAt", "workspaceId", "attachments"],
+        attributes: [
+          "id",
+          "title",
+          "updatedAt",
+          "workspaceId",
+          "attachments",
+          "userId",
+        ],
+        include: [
+          {
+            model: require("../models/user"),
+            as: "user",
+            attributes: ["id", "name", "email"],
+          },
+        ],
         order: [["updatedAt", "DESC"]],
       });
 
@@ -46,6 +60,8 @@ class ArticleService {
         attachments: article.attachments || [],
         workspaceId: article.workspaceId,
         updatedAt: article.updatedAt,
+        userId: article.userId,
+        userName: article.user ? article.user.name : "User",
       }));
     } catch (err) {
       console.error("Error fetching articles:", err);
@@ -55,7 +71,15 @@ class ArticleService {
 
   async getArticleById(id) {
     try {
-      const article = await this.Article.findByPk(id);
+      const article = await this.Article.findByPk(id, {
+        include: [
+          {
+            model: require("../models/user"),
+            as: "user",
+            attributes: ["id", "name", "email"],
+          },
+        ],
+      });
       handleArticleNotFound(article, id);
       return article;
     } catch (err) {
@@ -66,7 +90,7 @@ class ArticleService {
     }
   }
 
-  async createArticle(articleData) {
+  async createArticle(articleData, userId) {
     validateArticleData(articleData);
 
     try {
@@ -81,6 +105,7 @@ class ArticleService {
         workspaceId: articleData.workspaceId || null,
         attachments: [],
         currentVersion: 1,
+        userId: userId,
       });
 
       const version = await this.ArticleVersion.create({
@@ -90,7 +115,8 @@ class ArticleService {
         content: articleData.content,
         workspaceId: articleData.workspaceId || null,
         attachments: [],
-        createdBy: "author",
+        createdBy: userId ? "user" : "system",
+        userId: userId,
       });
 
       await article.update({
@@ -104,7 +130,7 @@ class ArticleService {
     }
   }
 
-  async updateArticle(id, updateData) {
+  async updateArticle(id, updateData, userId) {
     validateArticleData(updateData);
 
     try {
@@ -117,6 +143,7 @@ class ArticleService {
         workspaceId: updateData.workspaceId || article.workspaceId,
         attachments: article.attachments || [],
         createdBy: "user",
+        userId: userId,
       });
 
       return {
@@ -150,6 +177,7 @@ class ArticleService {
         workspaceId: versionData.workspaceId || article.workspaceId,
         attachments: versionData.attachments || article.attachments || [],
         createdBy: versionData.createdBy || "system",
+        userId: versionData.userId,
       });
 
       await article.update({
@@ -159,10 +187,19 @@ class ArticleService {
         attachments: versionData.attachments || article.attachments || [],
         currentVersion: newVersionNumber,
         latestVersionId: newVersion.id,
+        userId: versionData.userId || article.userId,
       });
 
       return {
-        article: await this.Article.findByPk(articleId),
+        article: await this.Article.findByPk(articleId, {
+          include: [
+            {
+              model: require("../models/user"),
+              as: "user",
+              attributes: ["id", "name", "email"],
+            },
+          ],
+        }),
         version: newVersion,
       };
     } catch (error) {
@@ -177,7 +214,21 @@ class ArticleService {
       const versions = await this.ArticleVersion.findAll({
         where: { articleId },
         order: [["version", "DESC"]],
-        attributes: ["id", "version", "title", "createdBy", "createdAt"],
+        include: [
+          {
+            model: require("../models/user"),
+            as: "user",
+            attributes: ["id", "name", "email"],
+          },
+        ],
+        attributes: [
+          "id",
+          "version",
+          "title",
+          "createdBy",
+          "createdAt",
+          "userId",
+        ],
       });
 
       return versions;
@@ -195,6 +246,13 @@ class ArticleService {
           articleId,
           version: versionNumber,
         },
+        include: [
+          {
+            model: require("../models/user"),
+            as: "user",
+            attributes: ["id", "name", "email"],
+          },
+        ],
       });
 
       if (!version) {
@@ -238,7 +296,7 @@ class ArticleService {
     }
   }
 
-  async addAttachments(articleId, files) {
+  async addAttachments(articleId, files, userId) {
     validateAttachmentFiles(files);
 
     try {
@@ -251,6 +309,7 @@ class ArticleService {
 
       await article.update({
         attachments: updatedAttachments,
+        userId: userId || article.userId,
       });
 
       return { article, attachments: newAttachments };
@@ -304,9 +363,28 @@ class ArticleService {
       const article = await this.Article.findByPk(articleId, {
         include: [
           {
+            model: require("../models/user"),
+            as: "user",
+            attributes: ["id", "name", "email"],
+          },
+          {
             model: require("../models/comment"),
             as: "comments",
-            attributes: ["id", "content", "author", "createdAt", "updatedAt"],
+            include: [
+              {
+                model: require("../models/user"),
+                as: "user",
+                attributes: ["id", "name", "email"],
+              },
+            ],
+            attributes: [
+              "id",
+              "content",
+              "author",
+              "createdAt",
+              "updatedAt",
+              "userId",
+            ],
             order: [["createdAt", "ASC"]],
           },
         ],

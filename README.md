@@ -1,6 +1,6 @@
 # Wiki Project
 
-A full-stack application for creating and managing articles with a WYSIWYG editor.
+A full-stack application for creating and managing articles with a WYSIWYG editor and full user authentication and authorization.
 
 ## Features
 
@@ -15,6 +15,9 @@ A full-stack application for creating and managing articles with a WYSIWYG edito
 - Database Storage: All data persisted in PostgreSQL database
 - File Attachments: Upload images and PDFs to articles
 - Real-Time Notifications: Live updates when articles are modified
+- User Authentication: Secure registration and login with JWT tokens
+- Protected Content: Access control for articles and comments
+- Article Versioning: Track all changes to articles with full version history
 
 ## Built with
 
@@ -22,6 +25,8 @@ A full-stack application for creating and managing articles with a WYSIWYG edito
 **Backend:** Node.js, Express.js
 **Database:** PostgreSQL with Sequelize ORM
 **Real-time:** Socket.IO for live updates
+**Authentication:** JWT, bcrypt, React Context
+**Security:** Protected Routes, Token Validation, Password Hashing
 
 ## Architecture & Code Quality
 
@@ -32,12 +37,16 @@ A full-stack application for creating and managing articles with a WYSIWYG edito
 - **Database Models**: Sequelize ORM with proper data validation and indexes
 - **Service Layer**: Separated business logic (ArticleService, CommentService)
 - **Migrations**: Database schema versioning and reproducibility
+- **Version Control System**: Complete article versioning with rollback capability
+- **Authentication Layer**: JWT-based auth with protected routes and endpoints
 
 ## Database Schema
 
 - **articles**: Stores article content, titles, workspace associations, and attachments metadata
+- **article_versions**: Complete version history for articles with change tracking
 - **comments**: Stores user comments with article relationships and author information  
 - **workspaces**: Predefined categories for organizing articles (Nature, Technology, Culture, etc.)
+- **users**: User accounts for authentication and attribution
 
 ## Installation & Setup
 
@@ -52,12 +61,14 @@ A full-stack application for creating and managing articles with a WYSIWYG edito
 createdb wiki_dev
 ```
 
-2. Set up environment variables in backend/.env.BackUp file:
+2. Set up environment variables in backend/.env file:
 DB_USERNAME=your_username
 DB_PASSWORD=your_password
 DB_NAME=wiki_dev
 DB_HOST=localhost
 DB_PORT=5432
+JWT_SECRET=your-jwt-secret-key
+JWT_EXPIRES_IN=24h
 
 3. Run database setup:
 ```bash
@@ -84,12 +95,22 @@ npm run dev
 
 ## API Endpoints
 
+### Authentication
+- POST /api/auth/register - Register new user
+- POST /api/auth/login - User login with JWT response
+- GET /api/auth/profile - Get authenticated user profile
+
 ### Articles
 - GET /articles - List all articles
 - GET /articles/:id - Get specific article
 - POST /articles - Create new article
 - PUT /articles/:id - Update existing article
 - DELETE /articles/:id - Delete article
+
+### Version History
+- GET /api/articles/:id/versions - Get all versions of an article (shows who changed)
+- GET /api/articles/:id/versions/:versionNumber - Get specific version
+- POST /api/articles/:id/versions/:versionNumber/restore - Restore to previous version
 
 ### Attachments
 - POST /articles/:id/attachments - Upload files to article
@@ -111,19 +132,24 @@ npm run dev
 - notification - Send real-time notifications to users
 
 ## Usage
-1. **View Articles**: Navigate to the home page to see all articles
-2. **Filter by Workspace**: Use tabs to filter articles by category (All, Nature, Technology, Culture, Education, Uncategorized)
-3. **Create Article**: Click "Create New Article" to open the editor
-4. **Select Workspace**:: Choose appropriate category for your article
-5. **Write Content**: Use the WYSIWYG editor to format content
-6. **Add Attachments**: Upload images or PDF files (JPG, PNG, GIF, WebP, PDF only)
-7. **Save**: Submit the form to save article
-8. **Read**: Click any article title to view full content
-9. **Add Comments**: Write comments on articles with optional author name
-10. **Edit**: Click "Edit" while viewing an article to modify it
-11. **Cancel Editing**: Click "Cancel" to discard changes and return to previous page
-12. **Delete**: Click "Delete" to remove an article (with confirmation)
-13. **Real-Time Updates**: Receive notifications when other users modify articles
+1. **Register**: Create account with email and password
+2. **Login**: Authenticate to receive JWT token
+3. **Access Control**: Only authenticated users can create/edit content
+4. **View Articles**: Navigate to the home page to see all articles
+5. **Filter by Workspace**: Use tabs to filter articles by category (All, Nature, Technology, Culture, Education, Uncategorized)
+6. **Create Article**: Click "Create New Article" to open the editor
+7. **Select Workspace**:: Choose appropriate category for your article
+8. **Write Content**: Use the WYSIWYG editor to format content
+9. **Add Attachments**: Upload images or PDF files (JPG, PNG, GIF, WebP, PDF only)
+10. **Save**: Submit the form to save article
+11. **Read**: Click any article title to view full content
+12. **Edit**: Click "Edit" while viewing an article to modify it
+13. **Cancel Editing**: Click "Cancel" to discard changes and return to previous page
+14. **Delete**: Click "Delete" to remove an article (with confirmation)
+15. **Version History**: View all changes and who made them
+16. **Track Changes**: Every edit creates a new version with timestamp and author
+17. **View History**: See complete version timeline with change details
+18. **Real-Time Updates**: Receive notifications when other users modify articles
 
 ## File Attachments
 - Supported formats: JPG, JPEG, PNG, GIF, WebP, PDF
@@ -147,3 +173,9 @@ npm run dev
 - **User Feedback**: Clear error messages and loading states
 - **Real-Time Notifications**: Live alerts for article changes and file operations
 - **Database Constraints**: Data integrity enforced at database level
+- **Email Format Validation**: Proper email format required for registration/login
+- **Password Strength**: Minimum 6 characters for passwords
+- **Unique Email**: Email must be unique during registration
+- **Credential Validation**: Email/password verified during login
+- **Token Validation**: JWT tokens checked for validity and expiration
+- **Ownership Validation**: Users can only modify their own content

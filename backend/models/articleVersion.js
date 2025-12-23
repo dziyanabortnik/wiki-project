@@ -47,6 +47,10 @@ const ArticleVersion = sequelize.define('ArticleVersion', {
     allowNull: false,
     defaultValue: 'system'
   },
+  userId: {
+    type: DataTypes.UUID,
+    allowNull: true
+  },
   changeReason: {
     type: DataTypes.STRING,
     allowNull: true

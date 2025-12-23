@@ -1,6 +1,6 @@
 import { useState } from "react";
+import { useAuth } from "../hooks/useAuth";
 
-// Component for managing file attachments
 export default function AttachmentManager({
   articleId,
   attachments = [],
@@ -11,6 +11,7 @@ export default function AttachmentManager({
 }) {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
+  const { getAuthHeader, isAuthenticated } = useAuth();
 
   // Handle file selection and preview
   const handleFileUpload = async (e) => {
@@ -18,20 +19,24 @@ export default function AttachmentManager({
     if (!files.length) return;
 
     const allowedTypes = [
-      'image/jpeg',
-      'image/jpg', 
-      'image/png',
-      'image/gif',
-      'image/webp',
-      'application/pdf'
+      "image/jpeg",
+      "image/jpg",
+      "image/png",
+      "image/gif",
+      "image/webp",
+      "application/pdf",
     ];
 
-    const invalidFiles = Array.from(files).filter(file => 
-      !allowedTypes.includes(file.type)
+    const invalidFiles = Array.from(files).filter(
+      (file) => !allowedTypes.includes(file.type)
     );
 
     if (invalidFiles.length > 0) {
-      setError(`Invalid file types: ${invalidFiles.map(f => f.name).join(', ')}. Only images (JPG, PNG, GIF, WebP) and PDFs are allowed.`);
+      setError(
+        `Invalid file types: ${invalidFiles
+          .map((f) => f.name)
+          .join(", ")}. Only images (JPG, PNG, GIF, WebP) and PDFs are allowed.`
+      );
       e.target.value = "";
       return;
     }
@@ -74,12 +79,23 @@ export default function AttachmentManager({
 
     try {
       const res = await fetch(
-        `http://localhost:3000/articles/${articleId}/attachments/${attachmentId}`,
-        { method: "DELETE" }
+        `/api/articles/${articleId}/attachments/${attachmentId}`,
+        {
+          method: "DELETE",
+          headers: getAuthHeader(),
+        }
       );
-      if (!res.ok) throw new Error("Delete failed");
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(
+          errorData.message || `Delete failed with status ${res.status}`
+        );
+      }
+
       onAttachmentsChange?.(attachments.filter((a) => a.id !== attachmentId));
     } catch (err) {
+      console.error("Error removing attachment:", err);
       alert("Error removing attachment: " + err.message);
     }
   };
@@ -113,15 +129,21 @@ export default function AttachmentManager({
 
       {error && <div className="error-message">{error}</div>}
 
-      <div className="file-upload">
-        <input
-          type="file"
-          multiple
-          accept=".jpg,.jpeg,.png,.gif,.webp,.pdf"
-          onChange={handleFileUpload}
-          disabled={uploading}
-        />
-      </div>
+      {isAuthenticated ? (
+        <div className="file-upload">
+          <input
+            type="file"
+            multiple
+            accept=".jpg,.jpeg,.png,.gif,.webp,.pdf"
+            onChange={handleFileUpload}
+            disabled={uploading}
+          />
+        </div>
+      ) : (
+        <div>
+          <p>Please login to upload attachments.</p>
+        </div>
+      )}
 
       <div className="attachments-list">
         {filesToShow.length === 0 ? (
@@ -132,13 +154,17 @@ export default function AttachmentManager({
             const href = getHrefFor(a, isNew);
             return (
               <div key={a.id}>
-                {href ? (
-                  <a href={href} target="_blank" rel="noopener noreferrer">
-                    {a.originalName}
-                  </a>
-                ) : (
-                  <span>{a.originalName}</span>
-                )}
+                <div>
+                  {href ? (
+                    <a href={href} target="_blank" rel="noopener noreferrer">
+                      {a.originalName}
+                      <span>{isNew ? "(new)" : ""}</span>
+                    </a>
+                  ) : (
+                    <span>{a.originalName}</span>
+                  )}
+                  <span>({(a.size / 1024).toFixed(1)} KB)</span>
+                </div>
 
                 <button
                   type="button"

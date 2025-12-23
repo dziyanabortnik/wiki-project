@@ -3,12 +3,14 @@ import { Link } from 'react-router-dom';
 import { useArticleActions } from '../hooks/useArticleActions';
 import WorkspaceTabs from './WorkspaceTabs';
 import { workspaceNames, getWorkspaceName } from '../constants/workspaces';
+import { useAuth } from '../hooks/useAuth';
 
 export default function ArticleList() {
   const [articles, setArticles] = useState([]);
   const [selectedWorkspace, setSelectedWorkspace] = useState(null);
   const [loading, setLoading] = useState(false);
   const { deleteArticle } = useArticleActions();
+  const { getAuthHeader } = useAuth();
 
   // Fetch articles list when component mounts or workspace changes
   useEffect(() => {
@@ -18,15 +20,22 @@ export default function ArticleList() {
   const loadArticles = async () => {
     setLoading(true);
     try {
-      const baseUrl = 'http://localhost:3000/articles';
+      const baseUrl = '/api/articles';
       const url = selectedWorkspace !== null 
         ? `${baseUrl}?workspaceId=${selectedWorkspace}`
         : baseUrl;
 
       console.log('Fetching from URL:', url);
       
-      const res = await fetch(url);
+      const res = await fetch(url, {
+        headers: getAuthHeader()
+      });
       console.log('Response status:', res.status);
+      
+      if (res.status === 401) {
+        // Unauthorized - token expired or invalid
+        throw new Error('Session expired. Please login again.');
+      }
       
       if (!res.ok) throw new Error('Failed to fetch articles');
       
@@ -81,9 +90,18 @@ export default function ArticleList() {
           <li key={a.id} className='article-item'>
             <Link to={`/view/${a.id}`} className='article-title'>{a.title}</Link>
             
-            <div className="article-actions">
-              <Link to={`/edit/${a.id}`} className="edit-link">Edit</Link>
-              <button onClick={() => handleDelete(a.id, a.title)} className="delete-btn">Delete</button>
+            <div className="article-meta">
+              <div className="article-author">
+                <div className="author-avatar">
+                  {a.userName ? a.userName.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2) : 'AN'}
+                </div>
+                <span>{a.userName}</span>
+              </div>
+              
+              <div className="article-actions">
+                <Link to={`/edit/${a.id}`} className="edit-link">Edit</Link>
+                <button onClick={() => handleDelete(a.id, a.title)} className="delete-btn">Delete</button>
+              </div>
             </div>
           </li>
         ))}

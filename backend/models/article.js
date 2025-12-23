@@ -39,6 +39,10 @@ const Article = sequelize.define('Article', {
     type: DataTypes.UUID,
     allowNull: true
   },
+  userId: {
+    type: DataTypes.UUID,
+    allowNull: true
+  },
   createdAt: {
     type: DataTypes.DATE,
     allowNull: false,

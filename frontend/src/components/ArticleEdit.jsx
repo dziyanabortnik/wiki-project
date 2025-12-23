@@ -4,6 +4,7 @@ import AttachmentManager from "./AttachmentManager";
 import socket from "../services/socket";
 import ReactQuill from "react-quill";
 import "react-quill/dist/quill.snow.css";
+import { useAuth } from '../hooks/useAuth';
 
 const QuillEditor = forwardRef(({ value, onChange }, ref) => (
   <ReactQuill ref={ref} value={value} onChange={onChange} />
@@ -20,16 +21,21 @@ export default function ArticleEdit() {
   const [attachments, setAttachments] = useState([]);
   const [newAttachments, setNewAttachments] = useState([]);
   const navigate = useNavigate();
+  const { getAuthHeader } = useAuth();
 
   // Load article data when component mounts
   useEffect(() => {
     setLoading(true);
-    fetch(`http://localhost:3000/articles/${id}`)
+    fetch(`/api/articles/${id}`, {
+      headers: getAuthHeader()
+    })
       .then((res) => {
         if (!res.ok) {
           if (res.status === 404) {
             setArticleExists(false);
             setError("Article not found");
+          } else if (res.status === 401) {
+            setError("Session expired. Please login again.");
           } else {
             throw new Error("Failed to load article");
           }
@@ -94,15 +100,22 @@ export default function ArticleEdit() {
     setLoading(true);
 
     try {
-      const res = await fetch(`http://localhost:3000/articles/${id}`, {
+      const res = await fetch(`/api/articles/${id}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          ...getAuthHeader()
+        },
         body: JSON.stringify({ 
           title, 
           content,
           workspaceId: selectedWorkspace 
         }),
       });
+
+      if (res.status === 401) {
+        throw new Error("Session expired. Please login again.");
+      }
 
       if (res.status === 404) {
         setArticleExists(false);
@@ -126,38 +139,31 @@ export default function ArticleEdit() {
       if (newAttachments.length > 0) {
         console.log(`Uploading ${newAttachments.length} new attachments...`);
 
-        for (const attachment of newAttachments) {
-          try {
-            const formData = new FormData();
-            formData.append("files", attachment.file);
+        const formData = new FormData();
+        newAttachments.forEach(attachment => {
+          formData.append('files', attachment.file);
+        });
 
-            console.log(`Uploading new attachment: ${attachment.originalName}`);
-            const attachmentRes = await fetch(
-              `http://localhost:3000/articles/${id}/attachments`,
-              {
-                method: "POST",
-                body: formData,
-              }
-            );
-
-            if (!attachmentRes.ok) {
-              const errorText = await attachmentRes
-                .text()
-                .catch(() => "Unknown error");
-              console.error(
-                `Failed to upload attachment ${attachment.originalName}: ${errorText}`
-              );
-              setError(
-                `Failed to upload ${attachment.originalName}: ${errorText}`
-              );
-            } else {
-              console.log(
-                `New attachment uploaded: ${attachment.originalName}`
-              );
+        try {
+          console.log('Uploading new attachments...');
+          const attachmentRes = await fetch(
+            `/api/articles/${id}/attachments`,
+            {
+              method: "POST",
+              headers: getAuthHeader(),
+              body: formData,
             }
-          } catch (attachmentErr) {
-            console.error(`Error uploading new attachment:`, attachmentErr);
+          );
+
+          if (!attachmentRes.ok) {
+            const errorText = await attachmentRes.text();
+            console.error('Failed to upload attachments:', errorText);
+            setError(`Failed to upload attachments: ${errorText}`);
+          } else {
+            console.log('New attachments uploaded successfully');
           }
+        } catch (attachmentErr) {
+          console.error(`Error uploading new attachments:`, attachmentErr);
         }
 
         setNewAttachments([]);
