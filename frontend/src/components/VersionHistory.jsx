@@ -21,7 +21,7 @@ export default function VersionHistoryPage() {
       })
       .then((data) => {
         setArticle(data);
-        return fetch(`/api/articles/${id}/versions`, {
+        return fetch(`/api/versions/${id}/versions`, {
           headers: getAuthHeader(),
         });
       })

@@ -4,7 +4,7 @@ import AttachmentManager from "./AttachmentManager";
 import socket from "../services/socket";
 import ReactQuill from "react-quill";
 import "react-quill/dist/quill.snow.css";
-import { useAuth } from '../hooks/useAuth';
+import { useAuth } from "../hooks/useAuth";
 
 const QuillEditor = forwardRef(({ value, onChange }, ref) => (
   <ReactQuill ref={ref} value={value} onChange={onChange} />
@@ -20,6 +20,7 @@ export default function ArticleEdit() {
   const [articleExists, setArticleExists] = useState(true);
   const [attachments, setAttachments] = useState([]);
   const [newAttachments, setNewAttachments] = useState([]);
+
   const navigate = useNavigate();
   const { getAuthHeader } = useAuth();
 
@@ -27,7 +28,7 @@ export default function ArticleEdit() {
   useEffect(() => {
     setLoading(true);
     fetch(`/api/articles/${id}`, {
-      headers: getAuthHeader()
+      headers: getAuthHeader(),
     })
       .then((res) => {
         if (!res.ok) {
@@ -66,7 +67,6 @@ export default function ArticleEdit() {
     if (!id) return;
 
     socket.emit("join-article", id);
-
     const handleArticleUpdate = (updatedArticle) => {
       if (updatedArticle.id === id) {
         setTitle(updatedArticle.title || "");
@@ -77,7 +77,6 @@ export default function ArticleEdit() {
     };
 
     socket.on("article-updated", handleArticleUpdate);
-
     return () => {
       socket.off("article-updated", handleArticleUpdate);
     };
@@ -102,14 +101,14 @@ export default function ArticleEdit() {
     try {
       const res = await fetch(`/api/articles/${id}`, {
         method: "PUT",
-        headers: { 
+        headers: {
           "Content-Type": "application/json",
-          ...getAuthHeader()
+          ...getAuthHeader(),
         },
-        body: JSON.stringify({ 
-          title, 
+        body: JSON.stringify({
+          title,
           content,
-          workspaceId: selectedWorkspace 
+          workspaceId: selectedWorkspace,
         }),
       });
 
@@ -138,32 +137,27 @@ export default function ArticleEdit() {
       // Upload new attachments if any
       if (newAttachments.length > 0) {
         console.log(`Uploading ${newAttachments.length} new attachments...`);
-
         const formData = new FormData();
-        newAttachments.forEach(attachment => {
-          formData.append('files', attachment.file);
+        newAttachments.forEach((attachment) => {
+          formData.append("files", attachment.file);
         });
 
         try {
-          console.log('Uploading new attachments...');
-          const attachmentRes = await fetch(
-            `/api/articles/${id}/attachments`,
-            {
-              method: "POST",
-              headers: getAuthHeader(),
-              body: formData,
-            }
-          );
+          const attachmentRes = await fetch(`/api/articles/${id}/attachments`, {
+            method: "POST",
+            headers: getAuthHeader(),
+            body: formData,
+          });
 
           if (!attachmentRes.ok) {
             const errorText = await attachmentRes.text();
-            console.error('Failed to upload attachments:', errorText);
+            console.error("Failed to upload attachments:", errorText);
             setError(`Failed to upload attachments: ${errorText}`);
           } else {
-            console.log('New attachments uploaded successfully');
+            console.log("New attachments uploaded successfully");
           }
         } catch (attachmentErr) {
-          console.error(`Error uploading new attachments:`, attachmentErr);
+          console.error("Error uploading new attachments:", attachmentErr);
         }
 
         setNewAttachments([]);
@@ -199,7 +193,6 @@ export default function ArticleEdit() {
   return (
     <div className="article">
       <h2>Edit Article</h2>
-
       {error && <div className="error-message">{error}</div>}
 
       <form onSubmit={handleSubmit}>
@@ -216,7 +209,6 @@ export default function ArticleEdit() {
 
         <div className="workspace-selector">
           <label>Workspace: </label>
-
           <select
             value={selectedWorkspace}
             onChange={(e) => setSelectedWorkspace(e.target.value)}

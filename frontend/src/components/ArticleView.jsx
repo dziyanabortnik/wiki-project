@@ -9,7 +9,7 @@ import { useArticleActions } from "../hooks/useArticleActions";
 import socket from "../services/socket";
 import { getWorkspaceName } from "../constants/workspaces";
 import CommentsSection from "./CommentsSection";
-import { useAuth } from '../hooks/useAuth';
+import { useAuth } from "../hooks/useAuth";
 
 export default function ArticleView() {
   const { id } = useParams();
@@ -22,41 +22,64 @@ export default function ArticleView() {
   const navigate = useNavigate();
   const { getAuthHeader, user } = useAuth();
 
+  const canEditArticle = () => {
+    if (!user || !article) return false;
+    return user.role === "admin" || article.userId === user.id;
+  };
+
   //Fetch article data
   useEffect(() => {
     let url = `/api/articles/${id}`;
+    let isHistoricalMode = false;
+
     if (versionNumber) {
-      url = `/api/articles/${id}/versions/${versionNumber}`;
-      setIsHistorical(true);
+      url = `/api/versions/${id}/versions/${versionNumber}`
+      isHistoricalMode = true;
     }
 
+    console.log("Fetching from:", url);
     fetch(url, {
-      headers: getAuthHeader()
+      headers: getAuthHeader(),
     })
       .then((res) => {
+        console.log("Response status:", res.status);
         if (res.status === 401) {
-          throw new Error('Session expired. Please login again.');
+          throw new Error("Session expired. Please login again.");
+        }
+        if (res.status === 404) {
+          throw new Error("Article or version not found");
         }
         return res.json();
       })
       .then((data) => {
+        console.log("Received data:", data);
         setArticle(data);
-        if (data.isHistorical) setIsHistorical(true);
+        setIsHistorical(isHistoricalMode || data.isHistorical);
       })
-      .catch(console.error);
+      .catch((err) => {
+        console.error("Fetch error:", err);
+        setError(err.message);
+      });
 
-    // Load versions count only
-    fetch(`/api/articles/${id}/versions`, {
-      headers: getAuthHeader()
-    })
-      .then((res) => {
-        if (res.status === 401) {
-          throw new Error('Session expired. Please login again.');
-        }
-        return res.json();
+    if (!versionNumber) {
+      fetch(`/api/versions/${id}/versions`, { 
+        headers: getAuthHeader(),
       })
-      .then((versions) => setVersionsCount(versions.length))
-      .catch(console.error);
+        .then((res) => {
+          if (res.status === 401) {
+            throw new Error("Session expired. Please login again.");
+          }
+          return res.json();
+        })
+        .then((versions) => {
+          console.log("Versions loaded:", versions);
+          setVersionsCount(Array.isArray(versions) ? versions.length : 0);
+        })
+        .catch((err) => {
+          console.error("Failed to load versions:", err);
+          setVersionsCount(0);
+        });
+    }
   }, [id, versionNumber]);
 
   // Real-time updates
@@ -67,6 +90,7 @@ export default function ArticleView() {
     const handler = (updatedArticle) => {
       if (updatedArticle.id === id) setArticle(updatedArticle);
     };
+
     socket.on("article-updated", handler);
     return () => socket.off("article-updated", handler);
   }, [id, isHistorical]);
@@ -82,7 +106,7 @@ export default function ArticleView() {
     }
 
     let url = attachment.path;
-    if (!url.startsWith('http')) {
+    if (!url.startsWith("http")) {
       url = `http://localhost:3000${url.startsWith("/") ? "" : "/"}${url}`;
     }
     window.open(url, "_blank");
@@ -99,23 +123,17 @@ export default function ArticleView() {
           <strong>You are viewing version {versionNumber}</strong>
           <br />
           <small>Created: {new Date(article.createdAt).toLocaleString()}</small>
-          {article.user && (
-            <small> by {article.user.name}</small>
-          )}
+          {article.user && <small> by {article.user.name}</small>}
           <br />
           <div className="historical-actions">
-            <Link to={`/article/${id}/versions`} className="history-link">
+            <Link to={`/versions/${id}`} className="history-link">
               Back to version history
             </Link>
           </div>
         </div>
       )}
 
-      {error && (
-        <div className="error-message">
-          {error}
-        </div>
-      )}
+      {error && <div className="error-message">{error}</div>}
 
       <div className="article-header">
         <h2>{article.title}</h2>
@@ -123,20 +141,32 @@ export default function ArticleView() {
           <span className="workspace-badge">
             {getWorkspaceName(article.workspaceId)}
           </span>
-          
+
           {article.user && (
             <div className="article-author">
               <div className="author-avatar">
-                {article.user.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)}
+                {article.user.name
+                  .split(" ")
+                  .map((w) => w[0])
+                  .join("")
+                  .toUpperCase()
+                  .slice(0, 2)}
               </div>
               <span>Created by {article.user.name}</span>
             </div>
           )}
-          
-          {!isHistorical && versionsCount > 1 && (
+
+          {!isHistorical && (
             <span className="versions-count">
-              <Link to={`/article/${id}/versions`}>
-                {versionsCount - 1} change{versionsCount - 1 !== 1 ? "s" : ""}
+              <Link to={`/versions/${id}`}>
+                {versionsCount > 1 ? (
+                  <>
+                    {versionsCount - 1} change
+                    {versionsCount - 1 !== 1 ? "s" : ""}
+                  </>
+                ) : (
+                  "Version History"
+                )}
               </Link>
             </span>
           )}
@@ -169,19 +199,19 @@ export default function ArticleView() {
       {!isHistorical && <CommentsSection articleId={id} />}
 
       <div className="article-actions">
-        {!isHistorical && (
-          <Link to={`/edit/${article.id}`} className="edit-link">
-            Edit Article
-          </Link>
-        )}
-        {!isHistorical && (
-          <button 
-            onClick={handleDelete} 
-            className="delete-btn"
-            disabled={loading}
-          >
-            {loading ? 'Deleting...' : 'Delete Article'}
-          </button>
+        {!isHistorical && canEditArticle() && (
+          <>
+            <Link to={`/edit/${article.id}`} className="edit-link">
+              Edit Article
+            </Link>
+            <button
+              onClick={handleDelete}
+              className="delete-btn"
+              disabled={loading}
+            >
+              {loading ? "Deleting..." : "Delete Article"}
+            </button>
+          </>
         )}
         <Link to="/" className="back-link">
           Back to list
