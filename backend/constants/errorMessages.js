@@ -10,6 +10,13 @@ module.exports = {
     TOKEN_REQUIRED: 'Token required',
     PASSWORD_TOO_SHORT: 'Password must be at least 6 characters',
     INVALID_EMAIL: 'Invalid email format',
+
+    // Role Management
+    ROLE_REQUIRED: 'Role is required',
+    INVALID_ROLE: 'Invalid role. Must be "admin" or "user"',
+    PERMISSION_DENIED: 'Permission denied',
+    ADMIN_ONLY: 'Admin access required',
+    NOT_ARTICLE_OWNER: 'You can only edit your own articles',
     
     // Articles
     ARTICLE_NOT_FOUND: 'Article not found',
@@ -47,6 +54,9 @@ module.exports = {
     
     // Validation
     VALIDATION_ERROR: 'Validation error',
+    MIN_PASSWORD_LENGTH: 6,
+    DEFAULT_USER_ROLE: 'user',
+    VALID_ROLES: ['admin', 'user'],
     
     // Server
     INTERNAL_SERVER_ERROR: 'Internal server error'

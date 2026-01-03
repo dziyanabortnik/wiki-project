@@ -23,6 +23,11 @@ const User = sequelize.define('User', {
     type: DataTypes.STRING,
     allowNull: false
   },
+  role: {
+    type: DataTypes.ENUM('admin', 'user'),
+    allowNull: false,
+    defaultValue: 'user'
+  },
   createdAt: {
     type: DataTypes.DATE,
     allowNull: false,
@@ -35,7 +40,15 @@ const User = sequelize.define('User', {
   }
 }, {
   tableName: 'users',
-  timestamps: true
+  timestamps: true,
+  defaultScope: {
+    attributes: { exclude: ['password'] } // Hide password by default
+  },
+  scopes: {
+    withPassword: {
+      attributes: { include: ['password'] } // Include password for authentication
+    }
+  }
 });
 
 module.exports = User;

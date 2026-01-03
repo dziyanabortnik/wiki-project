@@ -14,6 +14,7 @@ import VersionHistoryPage from "./components/VersionHistory";
 import Register from "./components/Register";
 import Login from "./components/Login";
 import ProtectedRoute from "./components/ProtectedRoute";
+import UserManagement from "./components/UserManagement";
 import "./App.css";
 
 function App() {
@@ -24,7 +25,6 @@ function App() {
         <Routes>
           <Route path="/register" element={<Register />} />
           <Route path="/login" element={<Login />} />
-
           <Route
             path="/"
             element={
@@ -58,14 +58,21 @@ function App() {
             }
           />
           <Route
-            path="/article/:id/versions"
+            path="/versions/:id"
             element={
               <ProtectedRoute>
                 <VersionHistoryPage />
               </ProtectedRoute>
             }
           />
-
+          <Route
+            path="/admin/users"
+            element={
+              <ProtectedRoute requireAdmin>
+                <UserManagement />
+              </ProtectedRoute>
+            }
+          />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </div>

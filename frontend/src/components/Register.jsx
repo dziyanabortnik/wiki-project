@@ -2,16 +2,19 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 
-const Register = () => {
+export default function Register() {
   const [formData, setFormData] = useState({
     name: "",
     email: "",
     password: "",
     confirmPassword: "",
+    role: "user",
   });
+
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
+
   const { register } = useAuth();
   const navigate = useNavigate();
 
@@ -53,7 +56,8 @@ const Register = () => {
     const result = await register(
       formData.name,
       formData.email,
-      formData.password
+      formData.password,
+      formData.role
     );
 
     if (result.success) {
@@ -112,6 +116,23 @@ const Register = () => {
           required
         />
 
+        <div className="form-group">
+          <label htmlFor="role">Role:</label>
+          <select
+            id="role"
+            name="role"
+            value={formData.role}
+            onChange={handleChange}
+            className="role-select"
+          >
+            <option value="user">User</option>
+            <option value="admin">Admin</option>
+          </select>
+          <small className="form-text">
+            Choose "Admin" for administrative privileges
+          </small>
+        </div>
+
         <button type="submit" disabled={loading}>
           {loading ? "Registering..." : "Register"}
         </button>
@@ -124,6 +145,4 @@ const Register = () => {
       </div>
     </div>
   );
-};
-
-export default Register;
+}
