@@ -14,7 +14,11 @@ const authenticateToken = (req, res, next) => {
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+    if (!process.env.JWT_SECRET) {
+      throw new Error('JWT_SECRET is not configured');
+    }
+    
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
     req.user = decoded;
     next();
   } catch (error) {
@@ -23,6 +27,14 @@ const authenticateToken = (req, res, next) => {
         success: false,
         message: ERRORS.TOKEN_EXPIRED,
         error: 'Token has expired'
+      });
+    }
+    
+    if (error.message === 'JWT_SECRET is not configured') {
+      return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+        success: false,
+        message: 'Authentication service unavailable',
+        error: 'Server configuration error - JWT_SECRET not set'
       });
     }
     
@@ -38,12 +50,11 @@ const optionalAuth = (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
 
-  if (token) {
+  if (token && process.env.JWT_SECRET) {
     try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
       req.user = decoded;
     } catch (error) {
-      // If token is invalid, just continue without user
     }
   }
   

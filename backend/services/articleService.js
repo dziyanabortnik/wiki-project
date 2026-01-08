@@ -130,12 +130,16 @@ class ArticleService {
     }
   }
 
-  async updateArticle(id, updateData, userId) {
+  async updateArticle(id, updateData, userId, userRole) {
     validateArticleData(updateData);
 
     try {
       const article = await this.Article.findByPk(id);
       handleArticleNotFound(article, id);
+
+      if (userRole !== "admin" && article.userId !== userId) {
+        throw new Error(ERRORS.NOT_ARTICLE_OWNER);
+      }
 
       const result = await this.createArticleVersion(id, {
         title: updateData.title.trim(),
@@ -151,7 +155,10 @@ class ArticleService {
         version: result.version.version,
       };
     } catch (err) {
-      if (err.message === "Article not found") {
+      if (
+        err.message === ERRORS.ARTICLE_NOT_FOUND ||
+        err.message === ERRORS.NOT_ARTICLE_OWNER
+      ) {
         throw err;
       }
       console.error("Update article error:", err);
@@ -270,10 +277,14 @@ class ArticleService {
   }
 
   // Delete article and all its versions
-  async deleteArticle(id) {
+  async deleteArticle(id, userId, userRole) {
     try {
       const article = await this.Article.findByPk(id);
       handleArticleNotFound(article, id);
+
+      if (userRole !== "admin" && article.userId !== userId) {
+        throw new Error(ERRORS.NOT_ARTICLE_OWNER);
+      }
 
       await this.ArticleVersion.destroy({
         where: { articleId: id },
@@ -289,7 +300,10 @@ class ArticleService {
 
       return true;
     } catch (err) {
-      if (err.message === ERRORS.ARTICLE_NOT_FOUND) {
+      if (
+        err.message === ERRORS.ARTICLE_NOT_FOUND ||
+        err.message === ERRORS.NOT_ARTICLE_OWNER
+      ) {
         throw err;
       }
       throw new Error(ERRORS.ARTICLE_DELETE_FAILED);

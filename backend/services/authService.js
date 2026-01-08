@@ -1,29 +1,38 @@
-const jwt = require('jsonwebtoken');
-const bcrypt = require('bcryptjs');
-const { ERRORS } = require('../constants/errorMessages');
-const User = require('../models/user');
+const jwt = require("jsonwebtoken");
+const bcrypt = require("bcryptjs");
+const { ERRORS } = require("../constants/errorMessages");
+const User = require("../models/user");
 
 class AuthService {
   constructor() {
-    this.jwtSecret = process.env.JWT_SECRET || 'your-secret-key';
-    this.jwtExpiresIn = process.env.JWT_EXPIRES_IN || '24h';
+    this.jwtSecret = process.env.JWT_SECRET;
+    this.jwtExpiresIn = process.env.JWT_EXPIRES_IN || "24h";
   }
 
   async register(userData) {
     try {
+      const { MIN_PASSWORD_LENGTH, DEFAULT_USER_ROLE, VALID_ROLES } = ERRORS;
+
       // Validate email format
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(userData.email)) {
         throw new Error(ERRORS.INVALID_EMAIL);
       }
 
-      if (userData.password.length < 6) {
-        throw new Error(ERRORS.PASSWORD_TOO_SHORT);
+      if (userData.password.length < MIN_PASSWORD_LENGTH) {
+        throw new Error(
+          `Password must be at least ${MIN_PASSWORD_LENGTH} characters`
+        );
+      }
+
+      const userRole = userData.role || DEFAULT_USER_ROLE;
+      if (!VALID_ROLES.includes(userRole)) {
+        throw new Error(ERRORS.INVALID_ROLE);
       }
 
       // Check if user already exists
       const existingUser = await User.findOne({
-        where: { email: userData.email.toLowerCase() }
+        where: { email: userData.email.toLowerCase() },
       });
 
       if (existingUser) {
@@ -36,7 +45,8 @@ class AuthService {
       const user = await User.create({
         email: userData.email.toLowerCase(),
         password: hashedPassword,
-        name: userData.name
+        name: userData.name,
+        role: userRole,
       });
 
       const token = this.generateToken(user);
@@ -47,23 +57,30 @@ class AuthService {
 
       return {
         user: userResponse,
-        token
+        token,
       };
     } catch (error) {
-      if (error.message.includes(ERRORS.USER_ALREADY_EXISTS) || 
-          error.message.includes(ERRORS.INVALID_EMAIL) ||
-          error.message.includes(ERRORS.PASSWORD_TOO_SHORT)) {
+      console.error("Registration error details:", error);
+      if (
+        error.message === ERRORS.INVALID_EMAIL ||
+        error.message === ERRORS.USER_ALREADY_EXISTS ||
+        error.message.includes("Password must be at least") ||
+        error.message === ERRORS.INVALID_ROLE
+      ) {
         throw error;
       }
-      console.error('Registration error:', error);
-      throw new Error('Failed to register user');
+      throw new Error(ERRORS.INTERNAL_SERVER_ERROR);
     }
   }
 
   async login(credentials) {
     try {
-      const user = await User.findOne({
-        where: { email: credentials.email.toLowerCase() }
+      if (!credentials.email || !credentials.password) {
+        throw new Error(ERRORS.INVALID_CREDENTIALS);
+      }
+
+      const user = await User.scope("withPassword").findOne({
+        where: { email: credentials.email.toLowerCase() },
       });
 
       if (!user) {
@@ -71,7 +88,16 @@ class AuthService {
       }
 
       // Check password
-      const isPasswordValid = await bcrypt.compare(credentials.password, user.password);
+      if (!user.password) {
+        console.error("User has no password stored:", user.email);
+        throw new Error(ERRORS.INVALID_CREDENTIALS);
+      }
+
+      const isPasswordValid = await bcrypt.compare(
+        credentials.password,
+        user.password
+      );
+
       if (!isPasswordValid) {
         throw new Error(ERRORS.INVALID_CREDENTIALS);
       }
@@ -85,23 +111,28 @@ class AuthService {
 
       return {
         user: userResponse,
-        token
+        token,
       };
     } catch (error) {
+      console.error("Login error details:", error);
       if (error.message === ERRORS.INVALID_CREDENTIALS) {
         throw error;
       }
-      console.error('Login error:', error);
-      throw new Error('Failed to login');
+      throw new Error(ERRORS.INTERNAL_SERVER_ERROR);
     }
   }
 
   generateToken(user) {
+    if (!this.jwtSecret) {
+      throw new Error("JWT_SECRET is not configured");
+    }
+    
     return jwt.sign(
       {
         id: user.id,
         email: user.email,
-        name: user.name
+        name: user.name,
+        role: user.role || ERRORS.DEFAULT_USER_ROLE,
       },
       this.jwtSecret,
       { expiresIn: this.jwtExpiresIn }
@@ -112,25 +143,31 @@ class AuthService {
     try {
       return jwt.verify(token, this.jwtSecret);
     } catch (error) {
-      throw new Error(error.name === 'TokenExpiredError' ? ERRORS.TOKEN_EXPIRED : ERRORS.TOKEN_INVALID);
+      throw new Error(
+        error.name === "TokenExpiredError"
+          ? ERRORS.TOKEN_EXPIRED
+          : ERRORS.TOKEN_INVALID
+      );
     }
   }
 
   async getProfile(userId) {
     try {
       const user = await User.findByPk(userId, {
-        attributes: { exclude: ['password'] }
+        attributes: { exclude: ["password"] },
       });
+
       if (!user) {
         throw new Error(ERRORS.USER_NOT_FOUND);
       }
+
       return user;
     } catch (error) {
       if (error.message === ERRORS.USER_NOT_FOUND) {
         throw error;
       }
-      console.error('Get profile error:', error);
-      throw new Error('Failed to get user profile');
+      console.error("Get profile error:", error);
+      throw new Error(ERRORS.INTERNAL_SERVER_ERROR);
     }
   }
 }
