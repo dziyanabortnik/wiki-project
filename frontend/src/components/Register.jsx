@@ -8,7 +8,6 @@ export default function Register() {
     email: "",
     password: "",
     confirmPassword: "",
-    role: "user",
   });
 
   const [error, setError] = useState("");
@@ -56,8 +55,7 @@ export default function Register() {
     const result = await register(
       formData.name,
       formData.email,
-      formData.password,
-      formData.role
+      formData.password
     );
 
     if (result.success) {
@@ -115,23 +113,6 @@ export default function Register() {
           onChange={handleChange}
           required
         />
-
-        <div className="form-group">
-          <label htmlFor="role">Role:</label>
-          <select
-            id="role"
-            name="role"
-            value={formData.role}
-            onChange={handleChange}
-            className="role-select"
-          >
-            <option value="user">User</option>
-            <option value="admin">Admin</option>
-          </select>
-          <small className="form-text">
-            Choose "Admin" for administrative privileges
-          </small>
-        </div>
 
         <button type="submit" disabled={loading}>
           {loading ? "Registering..." : "Register"}
