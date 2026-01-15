@@ -25,7 +25,7 @@ class AuthService {
         );
       }
 
-      const userRole = userData.role || DEFAULT_USER_ROLE;
+      const userRole = 'user';
       if (!VALID_ROLES.includes(userRole)) {
         throw new Error(ERRORS.INVALID_ROLE);
       }
@@ -126,7 +126,7 @@ class AuthService {
     if (!this.jwtSecret) {
       throw new Error("JWT_SECRET is not configured");
     }
-    
+
     return jwt.sign(
       {
         id: user.id,

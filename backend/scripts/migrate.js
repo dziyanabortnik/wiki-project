@@ -38,6 +38,10 @@ async function runMigrations() {
     }
 
     databaseLogger.logWorkspacesPopulated();
+
+    console.log("Creating admin user...");
+    await require("./createAdmin")();
+
     databaseLogger.logMigrationSuccess();
   } catch (error) {
     databaseLogger.logMigrationError(error);

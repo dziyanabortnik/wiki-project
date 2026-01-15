@@ -1521,3 +1521,136 @@ form {
   color: #007bff;
   text-decoration: none;
 }
+
+.search-section {
+  margin: 20px 0;
+  padding: 0 20px;
+}
+
+.search-bar {
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.search-input-group {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.search-input {
+  flex: 1;
+  padding: 12px 16px;
+  border: 2px solid #ddd;
+  border-radius: 8px;
+  font-size: 16px;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: #4a90e2;
+  box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.1);
+}
+
+.search-submit-btn {
+  padding: 12px 24px;
+  background-color: #4a90e2;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.search-submit-btn:hover:not(:disabled) {
+  background-color: #357ae8;
+}
+
+.search-submit-btn:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+}
+
+.search-clear-btn {
+  padding: 12px;
+  background-color: #f5f5f5;
+  border: 2px solid #ddd;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 18px;
+  color: #666;
+}
+
+.search-clear-btn:hover {
+  background-color: #e0e0e0;
+  color: #333;
+}
+
+.search-hint {
+  color: #666;
+  font-size: 14px;
+  margin-top: 4px;
+}
+
+.search-info {
+  font-size: 14px;
+  color: #666;
+  font-weight: normal;
+  margin-left: 8px;
+}
+
+.search-snippet {
+  margin: 8px 0;
+  padding: 12px;
+  background-color: #f9f9f9;
+  border-radius: 6px;
+  border-left: 4px solid #4a90e2;
+}
+
+.snippet-text {
+  color: #555;
+  line-height: 1.5;
+  font-size: 14px;
+}
+
+.snippet-text mark {
+  background-color: #fff3cd;
+  padding: 0 2px;
+  border-radius: 2px;
+  font-weight: 500;
+}
+
+.empty-search-results {
+  text-align: center;
+  padding: 40px 20px;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  margin: 20px 0;
+}
+
+.empty-search-results p {
+  font-size: 18px;
+  color: #666;
+  margin-bottom: 20px;
+}
+
+.clear-search-btn {
+  padding: 10px 20px;
+  background-color: #6c757d;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.clear-search-btn:hover {
+  background-color: #5a6268;
+}
+
+.article-title mark {
+  background-color: #fff3cd;
+  padding: 0 2px;
+  border-radius: 2px;
+}

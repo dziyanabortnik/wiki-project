@@ -90,6 +90,76 @@ class ArticleService {
     }
   }
 
+  // Search articles by title or content
+  async searchArticles(searchTerm, workspaceId = null) {
+    try {
+      console.log("Searching for:", searchTerm, "in workspace:", workspaceId);
+
+      const { Op } = require("sequelize");
+
+      let whereClause = {
+        [Op.or]: [
+          { title: { [Op.iLike]: `%${searchTerm}%` } },
+          { content: { [Op.iLike]: `%${searchTerm}%` } },
+        ],
+      };
+
+      if (
+        workspaceId &&
+        workspaceId !== "null" &&
+        workspaceId !== "undefined"
+      ) {
+        whereClause.workspaceId = workspaceId;
+      }
+
+      console.log("Search WHERE clause:", JSON.stringify(whereClause));
+
+      const articles = await this.Article.findAll({
+        where: whereClause,
+        attributes: [
+          "id",
+          "title",
+          "content",
+          "updatedAt",
+          "workspaceId",
+          "attachments",
+          "userId",
+        ],
+        include: [
+          {
+            model: require("../models/user"),
+            as: "user",
+            attributes: ["id", "name", "email"],
+          },
+        ],
+        order: [["updatedAt", "DESC"]],
+        limit: 50,
+      });
+
+      console.log(
+        `Found ${articles.length} articles for search "${searchTerm}"`
+      );
+
+      const results = articles.map((article) => ({
+        id: article.id,
+        title: article.title,
+        content: article.content,
+        attachments: article.attachments || [],
+        workspaceId: article.workspaceId,
+        updatedAt: article.updatedAt,
+        userId: article.userId,
+        userName: article.user ? article.user.name : "User",
+        isSearchResult: true,
+      }));
+
+      return results;
+    } catch (err) {
+      console.error("Error in searchArticles:", err);
+      console.error("Error stack:", err.stack);
+      throw new Error("Search failed: " + err.message);
+    }
+  }
+
   async createArticle(articleData, userId) {
     validateArticleData(articleData);
 

@@ -21,6 +21,7 @@ A full-stack application for creating and managing articles with a WYSIWYG edito
 - Role-Based Access Control: Admin and user roles with different permissions
 - User Management Dashboard: Admins can view and manage user roles
 - Article Ownership Protection: Only article creators or admins can edit articles
+- Article Search: Full-text search across article titles and content with highlighting
 
 ## Built with
 
@@ -42,6 +43,7 @@ A full-stack application for creating and managing articles with a WYSIWYG edito
 - **Migrations**: Database schema versioning and reproducibility
 - **Version Control System**: Complete article versioning with rollback capability
 - **Authentication Layer**: JWT-based auth with protected routes and endpoints
+- **Search Functionality**: Integrated search with database indexing and real-time result highlighting
 
 ## Database Schema
 
@@ -59,7 +61,7 @@ A full-stack application for creating and managing articles with a WYSIWYG edito
 - npm
 - PostgreSQL database
 
-### Database Setup
+### First-Time Setup (Only Once)
 
 1. Create PostgreSQL database:
 
@@ -76,21 +78,30 @@ createdb wiki_dev
    JWT_SECRET=your-jwt-secret-key  # Required for authentication to work
    JWT_EXPIRES_IN=24h
 
-3. Run database setup:
+3. Backend setup:
 
 ```bash
 cd backend
-npm run migrate
+npm install # Install dependencies (only first time or when dependencies change)
+npm run setup # Run initial setup (creates tables AND admin user)
+npm run dev
 ```
 
-## Manual Setup
+4. Frontend setup:
+
+```bash
+cd frontend
+npm install # Install dependencies (only first time or when dependencies change)
+npm run dev
+```
+
+## Regular Development Workflow
 
 ### Backend
 
 ```bash
 cd backend
-npm install
-npm run migrate
+npm install # Only if dependencies change
 npm run dev
 ```
 
@@ -98,7 +109,7 @@ npm run dev
 
 ```bash
 cd frontend
-npm install
+npm install # Only if dependencies change
 npm run dev
 ```
 
@@ -123,6 +134,7 @@ npm run dev
 - POST /articles - Create new article
 - PUT /articles/:id - Update existing article
 - DELETE /articles/:id - Delete article
+- GET /api/articles/search?q=term - Search articles by title or content
 
 ### Version History
 

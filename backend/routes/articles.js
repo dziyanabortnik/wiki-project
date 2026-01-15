@@ -24,6 +24,34 @@ const setSocketService = (service) => {
   socketService = service;
 };
 
+router.get("/search", optionalAuth, async (req, res, next) => {
+  try {
+    const { q, workspaceId } = req.query;
+
+    if (!q || q.trim() === "") {
+      return res.status(HTTP_STATUS.BAD_REQUEST).json({
+        success: false,
+        message: "Search query is required",
+        error: "Please provide a search term",
+      });
+    }
+
+    console.log("Search request received:", { q, workspaceId });
+
+    const searchResults = await articleService.searchArticles(
+      q.trim(),
+      workspaceId
+    );
+
+    console.log("Search results found:", searchResults.length);
+
+    res.status(HTTP_STATUS.OK).json(searchResults);
+  } catch (err) {
+    console.error("Search error details:", err);
+    next(err);
+  }
+});
+
 router.get("/", optionalAuth, async (req, res, next) => {
   try {
     const { workspaceId } = req.query;

@@ -13,6 +13,10 @@ module.exports = {
     `);
 
     await queryInterface.sequelize.query(`
+      UPDATE "users" SET role = 'user' WHERE role IS NULL OR role NOT IN ('admin', 'user');
+    `);
+
+    await queryInterface.sequelize.query(`
       ALTER TABLE "users" 
       ALTER COLUMN "role" TYPE "enum_users_role" 
       USING "role"::"enum_users_role";
