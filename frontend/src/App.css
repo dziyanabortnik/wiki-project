@@ -1654,3 +1654,23 @@ form {
   padding: 0 2px;
   border-radius: 2px;
 }
+
+.export-pdf-btn {
+  background-color: #e74c3c;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.2s;
+}
+
+.export-pdf-btn:hover {
+  background-color: #c0392b;
+}
+
+.export-pdf-btn:disabled {
+  background-color: #95a5a6;
+  cursor: not-allowed;
+}

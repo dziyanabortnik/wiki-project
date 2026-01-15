@@ -33,7 +33,7 @@ export default function ArticleView() {
     let isHistoricalMode = false;
 
     if (versionNumber) {
-      url = `/api/versions/${id}/versions/${versionNumber}`
+      url = `/api/versions/${id}/versions/${versionNumber}`;
       isHistoricalMode = true;
     }
 
@@ -62,7 +62,7 @@ export default function ArticleView() {
       });
 
     if (!versionNumber) {
-      fetch(`/api/versions/${id}/versions`, { 
+      fetch(`/api/versions/${id}/versions`, {
         headers: getAuthHeader(),
       })
         .then((res) => {
@@ -110,6 +110,45 @@ export default function ArticleView() {
       url = `http://localhost:3000${url.startsWith("/") ? "" : "/"}${url}`;
     }
     window.open(url, "_blank");
+  };
+
+  const handleExportPDF = async () => {
+    try {
+      console.log(`Exporting article ${id} to PDF...`);
+
+      const response = await fetch(`/api/articles/${id}/export`, {
+        headers: getAuthHeader(),
+      });
+
+      if (response.status === 401) {
+        throw new Error("Please login to export articles");
+      }
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Export failed: ${response.status} ${errorText}`);
+      }
+
+      // Get PDF blob
+      const pdfBlob = await response.blob();
+
+      // Create download link
+      const url = window.URL.createObjectURL(pdfBlob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `article-${article?.title || id}-${new Date()
+        .toISOString()
+        .slice(0, 10)}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      console.log("PDF exported successfully");
+    } catch (err) {
+      console.error("Export error:", err);
+      alert(`Error exporting PDF: ${err.message}`);
+    }
   };
 
   if (!article) return <div>Loading...</div>;
@@ -204,6 +243,11 @@ export default function ArticleView() {
             <Link to={`/edit/${article.id}`} className="edit-link">
               Edit Article
             </Link>
+
+            <button onClick={handleExportPDF} className="export-pdf-btn">
+              Export as PDF
+            </button>
+
             <button
               onClick={handleDelete}
               className="delete-btn"
