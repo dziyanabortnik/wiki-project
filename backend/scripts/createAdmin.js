@@ -8,51 +8,62 @@ async function createAdminUser() {
     await sequelize.authenticate();
     console.log("Database connection established.");
 
-    const existingAdmin = await User.findOne({
-      where: { email: "admin@wiki.com" },
-    });
+    const adminEmail = process.env.ADMIN_EMAIL;
+    const adminPassword = process.env.ADMIN_PASSWORD;
+    const adminName = process.env.ADMIN_NAME;
 
-    // Default admin credentials
-    const adminEmail = "admin@wiki.com";
-    const adminPassword = "Admin123!";
-    const adminName = "System Administrator";
-
-    // If admin user exists, show information with password
-    if (existingAdmin) {
-      console.log("ADMIN USER EXISTS");
-      console.log(`Email: ${existingAdmin.email}`);
-      console.log(`Name: ${existingAdmin.name}`);
-      console.log(`Role: ${existingAdmin.role}`);
-      console.log(`Password: ${adminPassword}`);
-      console.log(`Created: ${existingAdmin.createdAt.toLocaleDateString()}`);
-
-      return;
+    // Check if ALL required credentials are provided
+    if (!adminEmail || !adminPassword) {
+      console.error("ERROR: Admin credentials not configured");
+      console.log("\nTo create an admin user:");
+      console.log("1. Add these to your .env file:");
+      console.log("   ADMIN_EMAIL=your_admin@email.com");
+      console.log("   ADMIN_PASSWORD=your_secure_password");
+      console.log("   ADMIN_NAME=Admin Name");
+      console.log("\n2. Run: npm run create-admin");
+      process.exit(1);
     }
 
-    // Create new admin user if doesn't exist
+    // Check if ANY user already exists with this email
+    const existingUser = await User.findOne({
+      where: { email: adminEmail },
+    });
+
+    if (existingUser) {
+      console.log(`User with email '${adminEmail}' already exists.`);
+      console.log(`   Name: ${existingUser.name}`);
+      console.log(`   Role: ${existingUser.role}`);
+      console.log(`   Created: ${existingUser.createdAt.toLocaleDateString()}`);
+      
+      // Check if it's already an admin
+      if (existingUser.role === 'admin') {
+        console.log("\nThis user is already an administrator.");
+        console.log("   You can login with these credentials.");
+        return;
+      } else {
+        console.log(`\nThis user has role: '${existingUser.role}'`);
+        return;
+      }
+    }
+
+    // Create new admin user
     const hashedPassword = await bcrypt.hash(adminPassword, 10);
 
-    const adminUser = await User.create({
+    await User.create({
       email: adminEmail,
       password: hashedPassword,
-      name: adminName,
+      name: adminName || "Admin",
       role: "admin",
     });
 
-    console.log("ADMIN USER CREATED");
-    console.log(`Email: ${adminEmail}`);
-    console.log(`Password: ${adminPassword}`);
-    console.log(`Name: ${adminName}`);
+    console.log("Admin user created successfully!");
+    console.log(`   Email: ${adminEmail}`);
+    console.log(`   Name: ${adminName || "Admin"}`);
+    console.log(`   Password: ${adminPassword}`);
+    
   } catch (error) {
-    console.error("Error during admin user creation:", error.message);
-
-    if (error.name === "SequelizeConnectionError") {
-      console.log("Database connection failed. Please check:");
-      console.log("1. Is PostgreSQL running?");
-      console.log("2. Are database credentials in .env file correct?");
-      console.log("3. Does the database 'wiki_dev' exist?");
-    }
-
+    console.error("Error creating admin user:", error.message);
+    console.error("Full error:", error);
     process.exit(1);
   } finally {
     await sequelize.close();

@@ -22,6 +22,7 @@ A full-stack application for creating and managing articles with a WYSIWYG edito
 - User Management Dashboard: Admins can view and manage user roles
 - Article Ownership Protection: Only article creators or admins can edit articles
 - Article Search: Full-text search across article titles and content with highlighting
+- Export articles as PDF with clean formatting
 
 ## Built with
 
@@ -44,6 +45,7 @@ A full-stack application for creating and managing articles with a WYSIWYG edito
 - **Version Control System**: Complete article versioning with rollback capability
 - **Authentication Layer**: JWT-based auth with protected routes and endpoints
 - **Search Functionality**: Integrated search with database indexing and real-time result highlighting
+- **Server-Side PDF Generation**: Export any article as PDF document
 
 ## Database Schema
 
@@ -75,15 +77,21 @@ createdb wiki_dev
    DB_NAME=wiki_dev
    DB_HOST=localhost
    DB_PORT=5432
-   JWT_SECRET=your-jwt-secret-key  # Required for authentication to work
+
+   JWT_SECRET=your-jwt-secret-key # Required for authentication to work
    JWT_EXPIRES_IN=24h
+
+   ADMIN_EMAIL=admin@example.com # Admin Credentials (for first admin user)
+   ADMIN_PASSWORD=your_secure_password
+   ADMIN_NAME=Admin Name
 
 3. Backend setup:
 
 ```bash
 cd backend
 npm install # Install dependencies (only first time or when dependencies change)
-npm run setup # Run initial setup (creates tables AND admin user)
+npm run create-admin # Create admin user (only first time)
+npm run migrate
 npm run dev
 ```
 
@@ -135,6 +143,7 @@ npm run dev
 - PUT /articles/:id - Update existing article
 - DELETE /articles/:id - Delete article
 - GET /api/articles/search?q=term - Search articles by title or content
+- GET /api/articles/:id/export - Export article as PDF (requires authentication)
 
 ### Version History
 
@@ -189,6 +198,9 @@ npm run dev
 20. **Role Management**: Admins can view all users and change their roles
 21. **Article Permissions**: Users can only edit their own articles, admins can edit all
 22. **Admin Protection**: User management page accessible only to administrators
+23. **Export Articles**: Click "Export as PDF" to download article as PDF document
+24. **PDF Features**: Exported PDF includes all content, metadata, and attachment links
+25. **Cyrillic Support**: Proper Russian character rendering in exported documents
 
 ## File Attachments
 
