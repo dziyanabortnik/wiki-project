@@ -8,6 +8,7 @@ const { requireArticleOwnerOrAdmin } = require("../middleware/roleMiddleware");
 const { handleFileUpload } = require("../middleware/upload");
 const ArticleService = require("../services/articleService");
 const CommentService = require("../services/commentService");
+const pdfService = require("../services/pdfService");
 const { Article, Comment, ArticleVersion } = require("../models");
 const { HTTP_STATUS } = require("../constants/errorMessages");
 
@@ -227,6 +228,33 @@ router.post("/:id/comments", authenticateToken, async (req, res, next) => {
       comment,
     });
   } catch (err) {
+    next(err);
+  }
+});
+
+router.get("/:id/export", authenticateToken, async (req, res, next) => {
+  try {
+    const articleId = req.params.id;
+
+    console.log(`Exporting article ${articleId} to PDF...`);
+
+    // Generate PDF
+    const pdfBuffer = await pdfService.generateArticlePDF(articleId);
+
+    // Set response headers
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="article-${articleId}-${Date.now()}.pdf"`
+    );
+    res.setHeader("Content-Length", pdfBuffer.length);
+
+    // Send PDF
+    res.send(pdfBuffer);
+
+    console.log(`Article ${articleId} exported successfully`);
+  } catch (err) {
+    console.error("PDF export error:", err);
     next(err);
   }
 });
