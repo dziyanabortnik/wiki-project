@@ -5,31 +5,88 @@ const { ERRORS } = require("../constants/errorMessages");
 const { htmlToText } = require("html-to-text");
 const fs = require("fs");
 
+const FONT_CONSTANTS = {
+  REGULAR: "regular",
+  BOLD: "bold",
+  ITALIC: "italic",
+};
+
 class PDFService {
   constructor() {
     this.margin = 50;
     this.fonts = this.loadFonts();
+    this.fontConstants = FONT_CONSTANTS;
   }
 
-  // Load fonts for PDF generation, fallback to Helvetica if custom fonts not found
+  // Get base URL from environment variables
+  getBaseUrl() {
+    if (process.env.BASE_URL) {
+      return process.env.BASE_URL;
+    }
+
+    const host = process.env.HOST || "localhost";
+    const port = process.env.PORT || 3000;
+
+    if (
+      port === "80" ||
+      port === "443" ||
+      process.env.NODE_ENV === "production"
+    ) {
+      return `http${process.env.NODE_ENV === "production" ? "s" : ""}://${host}`;
+    }
+
+    return `http://${host}:${port}`;
+  }
+
+  // Helper to get font family name consistently
+  getFontFamily(fontWeight = FONT_CONSTANTS.REGULAR) {
+    const isCustomFont =
+      this.fonts[FONT_CONSTANTS.REGULAR] &&
+      this.fonts[FONT_CONSTANTS.REGULAR].includes(".ttf");
+
+    if (!isCustomFont) {
+      // System fonts
+      switch (fontWeight) {
+        case FONT_CONSTANTS.BOLD:
+          return "Helvetica-Bold";
+        case FONT_CONSTANTS.ITALIC:
+          return "Helvetica-Oblique";
+        default:
+          return "Helvetica";
+      }
+    }
+
+    // Custom fonts
+    switch (fontWeight) {
+      case FONT_CONSTANTS.BOLD:
+        return "DejaVuSans-Bold";
+      case FONT_CONSTANTS.ITALIC:
+        return "DejaVuSans-Oblique";
+      default:
+        return "DejaVuSans";
+    }
+  }
+
   loadFonts() {
     const fontsDir = path.join(__dirname, "../assets/fonts");
 
     const fonts = {
-      regular: path.join(fontsDir, "DejaVuSans.ttf"),
-      bold: path.join(fontsDir, "DejaVuSans-Bold.ttf"),
-      italic: path.join(fontsDir, "DejaVuSans-Oblique.ttf"),
+      [FONT_CONSTANTS.REGULAR]: path.join(fontsDir, "DejaVuSans.ttf"),
+      [FONT_CONSTANTS.BOLD]: path.join(fontsDir, "DejaVuSans-Bold.ttf"),
+      [FONT_CONSTANTS.ITALIC]: path.join(fontsDir, "DejaVuSans-Oblique.ttf"),
     };
 
     // Check if font files exist, use Helvetica as fallback
-    for (const [name, fontPath] of Object.entries(fonts)) {
+    for (const [weight, fontPath] of Object.entries(fonts)) {
       if (!fs.existsSync(fontPath)) {
         console.warn(
-          `Font not found: ${fontPath}, using Helvetica for ${name}`
+          `Font not found: ${fontPath}, using Helvetica for ${weight}`,
         );
-        if (name === "regular") fonts.regular = "Helvetica";
-        else if (name === "bold") fonts.bold = "Helvetica-Bold";
-        else if (name === "italic") fonts.italic = "Helvetica-Oblique";
+        if (weight === FONT_CONSTANTS.REGULAR) fonts[weight] = "Helvetica";
+        else if (weight === FONT_CONSTANTS.BOLD)
+          fonts[weight] = "Helvetica-Bold";
+        else if (weight === FONT_CONSTANTS.ITALIC)
+          fonts[weight] = "Helvetica-Oblique";
       }
     }
 
@@ -81,10 +138,16 @@ class PDFService {
       });
 
       // Register custom fonts if available
-      if (this.fonts.regular.includes(".ttf")) {
-        doc.registerFont("DejaVuSans", this.fonts.regular);
-        doc.registerFont("DejaVuSans-Bold", this.fonts.bold);
-        doc.registerFont("DejaVuSans-Oblique", this.fonts.italic);
+      if (
+        this.fonts[FONT_CONSTANTS.REGULAR] &&
+        this.fonts[FONT_CONSTANTS.REGULAR].includes(".ttf")
+      ) {
+        doc.registerFont("DejaVuSans", this.fonts[FONT_CONSTANTS.REGULAR]);
+        doc.registerFont("DejaVuSans-Bold", this.fonts[FONT_CONSTANTS.BOLD]);
+        doc.registerFont(
+          "DejaVuSans-Oblique",
+          this.fonts[FONT_CONSTANTS.ITALIC],
+        );
       }
 
       const buffers = [];
@@ -115,13 +178,9 @@ class PDFService {
   }
 
   addHeader(doc, article) {
-    const fontFamily = this.fonts.regular.includes(".ttf")
-      ? "DejaVuSans"
-      : "Helvetica";
-
     // Article title
     doc
-      .font(fontFamily + "-Bold")
+      .font(this.getFontFamily(FONT_CONSTANTS.BOLD))
       .fontSize(24)
       .text(article.title, { align: "center" })
       .moveDown(1);
@@ -136,12 +195,8 @@ class PDFService {
   }
 
   addMetadata(doc, article) {
-    const fontFamily = this.fonts.regular.includes(".ttf")
-      ? "DejaVuSans"
-      : "Helvetica";
-
     doc
-      .font(fontFamily + "-Oblique")
+      .font(this.getFontFamily(FONT_CONSTANTS.ITALIC))
       .fontSize(10)
       .text("Article Details:", { underline: true })
       .moveDown(0.5);
@@ -153,10 +208,10 @@ class PDFService {
     }
 
     metadata.push(
-      `Created: ${new Date(article.createdAt).toLocaleDateString()}`
+      `Created: ${new Date(article.createdAt).toLocaleDateString()}`,
     );
     metadata.push(
-      `Last updated: ${new Date(article.updatedAt).toLocaleDateString()}`
+      `Last updated: ${new Date(article.updatedAt).toLocaleDateString()}`,
     );
 
     if (article.workspaceId) {
@@ -170,24 +225,20 @@ class PDFService {
       metadata.push(
         `Workspace: ${
           workspaceNames[article.workspaceId] || article.workspaceId
-        }`
+        }`,
       );
     }
 
     doc
-      .font(fontFamily)
+      .font(this.getFontFamily())
       .fontSize(10)
       .list(metadata, { bulletRadius: 2 })
       .moveDown(2);
   }
 
   addAttachmentsSection(doc, article) {
-    const fontFamily = this.fonts.regular.includes(".ttf")
-      ? "DejaVuSans"
-      : "Helvetica";
-
     doc
-      .font(fontFamily + "-Bold")
+      .font(this.getFontFamily(FONT_CONSTANTS.BOLD))
       .fontSize(12)
       .text("Attachments:", { underline: true })
       .moveDown(0.5);
@@ -197,19 +248,20 @@ class PDFService {
       const name =
         attachment.originalName || attachment.filename || "Unnamed file";
 
-      // Create URL for PDF clickable link
+      // Create dynamic URL for PDF clickable link
       let fileUrl = null;
       if (attachment.path) {
-        fileUrl = attachment.path.startsWith("http")
-          ? attachment.path
-          : `http://localhost:3000${
-              attachment.path.startsWith("/") ? "" : "/"
-            }${attachment.path}`;
+        if (attachment.path.startsWith("http")) {
+          fileUrl = attachment.path;
+        } else {
+          const baseUrl = this.getBaseUrl();
+          fileUrl = `${baseUrl}${attachment.path.startsWith("/") ? "" : "/"}${attachment.path}`;
+        }
       }
 
       // Attachment as clickable link in PDF
       doc
-        .font(fontFamily)
+        .font(this.getFontFamily())
         .fontSize(10)
         .fillColor("blue")
         .text(`${index + 1}. ${name}`, {
@@ -221,14 +273,14 @@ class PDFService {
       // File details
       if (attachment.mimeType) {
         doc
-          .font(fontFamily + "-Oblique")
+          .font(this.getFontFamily(FONT_CONSTANTS.ITALIC))
           .fontSize(8)
           .text(`   Type: ${attachment.mimeType}`);
       }
 
       if (attachment.path) {
         doc
-          .font(fontFamily + "-Oblique")
+          .font(this.getFontFamily(FONT_CONSTANTS.ITALIC))
           .fontSize(8)
           .text(`   Path: ${attachment.path}`);
       }
@@ -240,12 +292,8 @@ class PDFService {
   }
 
   addContent(doc, article) {
-    const fontFamily = this.fonts.regular.includes(".ttf")
-      ? "DejaVuSans"
-      : "Helvetica";
-
     doc
-      .font(fontFamily + "-Bold")
+      .font(this.getFontFamily(FONT_CONSTANTS.BOLD))
       .fontSize(12)
       .text("Content:", { underline: true })
       .moveDown(0.5);
@@ -265,7 +313,7 @@ class PDFService {
 
     // Article content
     doc
-      .font(fontFamily)
+      .font(this.getFontFamily())
       .fontSize(12)
       .text(plainText, {
         align: "left",

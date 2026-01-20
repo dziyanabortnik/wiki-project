@@ -106,9 +106,13 @@ export default function ArticleView() {
     }
 
     let url = attachment.path;
-    if (!url.startsWith("http")) {
-      url = `http://localhost:3000${url.startsWith("/") ? "" : "/"}${url}`;
+
+    if (url.startsWith("http")) {
+      window.open(url, "_blank");
+      return;
     }
+
+    url = `${window.location.origin}${url.startsWith("/") ? "" : "/"}${url}`;
     window.open(url, "_blank");
   };
 

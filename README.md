@@ -78,9 +78,16 @@ createdb wiki_dev
    DB_HOST=localhost
    DB_PORT=5432
 
+   # Server configuration
+   PORT=3000
+   NODE_ENV=development
+   BASE_URL=http://localhost:3000 # For PDF export links
+
+   # Authentication
    JWT_SECRET=your-jwt-secret-key # Required for authentication to work
    JWT_EXPIRES_IN=24h
 
+   # Admin Credentials (for first admin user)
    ADMIN_EMAIL=admin@example.com # Admin Credentials (for first admin user)
    ADMIN_PASSWORD=your_secure_password
    ADMIN_NAME=Admin Name
@@ -208,6 +215,14 @@ npm run dev
 - Files are stored securely in uploads directory
 - Click attachments to view in new window/tab
 - Automatic cleanup when articles are deleted
+
+##  PDF Export Features
+- Server-side generation using pdfkit library
+- Dynamic URL generation for attachments (works in development and production)
+- Font constants system for consistent typography
+- Clean layout with proper sections and metadata
+- Clickable attachment links in generated PDFs
+- Authentication-protected export endpoint
 
 ## Workspace Categories
 
